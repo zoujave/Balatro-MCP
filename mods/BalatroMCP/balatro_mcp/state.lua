@@ -230,7 +230,7 @@ local function build_actions(screen)
         })
     end
 
-    if G and G.STAGE == G.STAGES.RUN then
+    if screen == "GAME_OVER" then
         add_action(actions, "return_to_menu", "Return to the main menu.")
     end
 

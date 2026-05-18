@@ -108,6 +108,8 @@ def test_state_only_exposes_ui_backed_actions_when_ready() -> None:
     assert 'screen == "SPLASH"' not in state_module
     assert "local blind_ui_ready = G and G.blind_select and G.blind_prompt_box" in state_module
     assert 'if screen == "BLIND_SELECT" and blind_ui_ready then' in state_module
+    assert 'if screen == "GAME_OVER" then' in state_module
+    assert "if G and G.STAGE == G.STAGES.RUN then" not in state_module
 
 
 def test_windows_scripts_cover_install_start_validate_and_package() -> None:
