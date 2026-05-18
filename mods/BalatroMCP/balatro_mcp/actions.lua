@@ -1,5 +1,31 @@
 local Actions = {}
 
+local ACTION_LOCK_SECONDS = {
+    start_run = 1.5,
+    select_blind = 1.0,
+    skip_blind = 0.5,
+    select_cards = 0.1,
+    play_hand = 1.0,
+    discard = 0.6,
+    cash_out = 1.2,
+    end_shop = 1.0,
+    reroll_shop = 0.7,
+    reroll_boss = 0.7,
+    buy = 0.7,
+    use = 0.7,
+    sell = 0.2,
+    skip_booster = 0.7,
+    sort_hand = 0.1,
+    return_to_menu = 1.2,
+}
+
+local function current_time()
+    if love and love.timer and love.timer.getTime then
+        return love.timer.getTime()
+    end
+    return os.clock()
+end
+
 local function fail(code, message, details, status, retryable)
     return nil, {
         code = code or "invalid_action",
@@ -29,12 +55,46 @@ local function current_state(mcp)
     return {}
 end
 
+local function action_lock_active(mcp)
+    if not mcp then
+        return false
+    end
+
+    local lock_until = tonumber(mcp.action_lock_until)
+    if lock_until and current_time() < lock_until then
+        return true
+    end
+
+    mcp.action_lock_until = nil
+    mcp.pending_action = nil
+    return false
+end
+
+local function set_action_lock(mcp, action)
+    if not mcp then
+        return
+    end
+
+    local seconds = ACTION_LOCK_SECONDS[action] or 0.5
+    if seconds <= 0 then
+        return
+    end
+
+    mcp.pending_action = action
+    mcp.action_lock_until = current_time() + seconds
+end
+
 local function ok(mcp, action, message)
+    set_action_lock(mcp, action)
     return {
         action = action,
         message = message or "Action queued.",
         state = current_state(mcp),
     }
+end
+
+local function callback_error(code, err)
+    return fail(code or "callback_failed", tostring(err), nil, 500, true)
 end
 
 local function get_index(request)
@@ -93,13 +153,43 @@ local function normalize_indices(request)
     return result
 end
 
+local function same_hand_selection(indices)
+    if not G or not G.hand or type(G.hand.highlighted) ~= "table" or type(G.hand.cards) ~= "table" then
+        return false
+    end
+    if #indices ~= #G.hand.highlighted then
+        return false
+    end
+
+    local selected = {}
+    for _, highlighted in ipairs(G.hand.highlighted) do
+        for index, card in ipairs(G.hand.cards) do
+            if card == highlighted then
+                selected[index] = true
+                break
+            end
+        end
+    end
+
+    for _, index in ipairs(indices) do
+        if not selected[index] then
+            return false
+        end
+    end
+    return true
+end
+
 local function select_hand_cards(request)
     local indices = normalize_indices(request)
     if not indices then
-        return true
+        return true, false
     end
     if not G or not G.hand or not G.hand.cards then
         return fail("hand_unavailable", "Hand is not available.", nil, 503)
+    end
+
+    if same_hand_selection(indices) then
+        return true, true
     end
 
     G.hand:unhighlight_all()
@@ -113,7 +203,7 @@ local function select_hand_cards(request)
         G.hand:add_to_highlighted(G.hand.cards[index], true)
     end
 
-    return true
+    return true, false
 end
 
 local function fake_event(card, id)
@@ -123,6 +213,21 @@ local function fake_event(card, id)
             id = id,
         },
     }
+end
+
+local function find_ui_child(root, ids)
+    if not root or type(root.get_UIE_by_ID) ~= "function" then
+        return nil
+    end
+
+    for _, id in ipairs(ids) do
+        local ok_find, child = pcall(root.get_UIE_by_ID, root, id)
+        if ok_find and child then
+            return child
+        end
+    end
+
+    return nil
 end
 
 local function get_blind_choice_key(request)
@@ -259,7 +364,7 @@ local function action_play_hand(mcp, request)
         return fail("missing_selection", "No hand cards are selected.")
     end
     if G.GAME and G.GAME.blind and G.GAME.blind.block_play then
-        return fail("blocked", "The current blind blocks playing a hand.")
+        return fail("blocked", "The current blind is temporarily blocking hand play.", nil, 503, true)
     end
 
     G.FUNCS.play_cards_from_highlighted({})
@@ -290,7 +395,86 @@ local function action_cash_out(mcp)
     if state_name() ~= "ROUND_EVAL" then
         return fail("invalid_state", "Cash out is only available during round evaluation.", { screen = state_name() })
     end
-    G.FUNCS.cash_out({ config = { button = "cash_out" } })
+    if not G.round_eval then
+        return fail("not_ready", "Round evaluation UI is not ready yet.", nil, 503, true)
+    end
+    if not G.GAME or not G.GAME.current_round or type(G.GAME.current_round.dollars) ~= "number" then
+        return fail("not_ready", "Round evaluation payout is still resolving.", nil, 503, true)
+    end
+
+    if stop_use then
+        stop_use()
+    end
+
+    local round = G.GAME.current_round
+    local resets = G.GAME.round_resets or {}
+
+    if G.E_MANAGER and G.E_MANAGER.clear_queue then
+        G.E_MANAGER:clear_queue()
+    end
+
+    if G.round_eval then
+        G.round_eval:remove()
+        G.round_eval = nil
+    end
+
+    if G.deck then
+        if G.deck.shuffle then
+            G.deck:shuffle("cashout" .. tostring(resets.ante or 1))
+        end
+        if G.deck.hard_set_T then
+            G.deck:hard_set_T()
+        end
+    end
+
+    if ease_dollars then
+        ease_dollars(G.GAME.current_round.dollars)
+    else
+        G.GAME.dollars = (G.GAME.dollars or 0) + G.GAME.current_round.dollars
+    end
+
+    if G.GAME.previous_round then
+        G.GAME.previous_round.dollars = G.GAME.dollars
+    end
+
+    round.jokers_purchased = 0
+    round.discards_left = math.max(0, (resets.discards or 0) + (G.GAME.round_bonus and G.GAME.round_bonus.discards or 0))
+    round.hands_left = math.max(1, (resets.hands or 1) + (G.GAME.round_bonus and G.GAME.round_bonus.next_hands or 0))
+
+    if ease_chips then
+        ease_chips(0)
+    else
+        G.GAME.chips = 0
+    end
+
+    if G.GAME.blind and G.GAME.blind.config and G.GAME.blind.config.blind then
+        G.GAME.blind.chips = 0
+        G.GAME.blind.chip_text = "0"
+    end
+
+    if G.GAME.round_resets and G.GAME.round_resets.blind_states and G.GAME.round_resets.blind_states.Boss == "Defeated" then
+        G.GAME.round_resets.blind_ante = G.GAME.round_resets.ante
+        if get_next_tag_key and G.GAME.round_resets.blind_tags then
+            G.GAME.round_resets.blind_tags.Small = get_next_tag_key()
+            G.GAME.round_resets.blind_tags.Big = get_next_tag_key()
+        end
+    end
+
+    if reset_blinds then
+        reset_blinds()
+    end
+
+    G.GAME.shop_free = nil
+    G.GAME.shop_d6ed = nil
+    G.STATE = G.STATES.SHOP
+    G.STATE_COMPLETE = false
+
+    if play_sound then
+        play_sound("coin7")
+    end
+    if G.VIBRATION then
+        G.VIBRATION = G.VIBRATION + 1
+    end
     return ok(mcp, "cash_out", "Cash out queued.")
 end
 
@@ -298,7 +482,18 @@ local function action_end_shop(mcp)
     if state_name() ~= "SHOP" then
         return fail("invalid_state", "Shop is not active.", { screen = state_name() })
     end
-    G.FUNCS.toggle_shop({})
+    if G.CONTROLLER and G.CONTROLLER.locks and G.CONTROLLER.locks.toggle_shop then
+        return fail("not_ready", "Shop transition is already in progress.", nil, 503, true)
+    end
+    if not G.shop then
+        return fail("not_ready", "Shop UI is not ready yet.", nil, 503, true)
+    end
+
+    local shop_button = find_ui_child(G.shop, { "next_round_button", "next_round", "toggle_shop" }) or G.shop
+    local ok_call, err = pcall(G.FUNCS.toggle_shop, shop_button)
+    if not ok_call then
+        return callback_error("end_shop_failed", err)
+    end
     return ok(mcp, "end_shop", "Shop exit queued.")
 end
 
@@ -436,6 +631,13 @@ function Actions.execute(mcp, request)
     local action = request.action or request.name
     if type(action) ~= "string" or action == "" then
         return fail("missing_action", "Request must include an action name.", nil, 400)
+    end
+
+    if action_lock_active(mcp) then
+        return fail("action_pending", "Previous action is still resolving.", {
+            pending_action = mcp and mcp.pending_action,
+            retry_after_seconds = math.max(0, (tonumber(mcp and mcp.action_lock_until) or 0) - current_time()),
+        }, 503, true)
     end
 
     local handler = HANDLERS[action]

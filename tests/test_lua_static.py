@@ -112,6 +112,43 @@ def test_state_only_exposes_ui_backed_actions_when_ready() -> None:
     assert "if G and G.STAGE == G.STAGES.RUN then" not in state_module
 
 
+def test_lua_actions_use_pending_action_lock() -> None:
+    action_module = read_text(MOD_DIR / "balatro_mcp" / "actions.lua")
+    state_module = read_text(MOD_DIR / "balatro_mcp" / "state.lua")
+
+    assert "ACTION_LOCK_SECONDS" in action_module
+    assert "action_lock_active(mcp)" in action_module
+    assert '"action_pending"' in action_module
+    assert "set_action_lock(mcp, action)" in action_module
+    assert "busy = action_lock_active(mcp)" in state_module
+    assert "if busy then" in state_module
+
+
+def test_cash_out_waits_for_round_eval_payout_to_finish() -> None:
+    action_module = read_text(MOD_DIR / "balatro_mcp" / "actions.lua")
+    state_module = read_text(MOD_DIR / "balatro_mcp" / "state.lua")
+
+    assert "round_eval_ready" in state_module
+    assert "local can_cash_out = round_eval_ready()" in state_module
+    assert 'if screen == "ROUND_EVAL" and can_cash_out then' in state_module
+    assert "current_round.dollars" in state_module
+    assert "current_round.dollars" in action_module
+    assert "G.STATE = G.STATES.SHOP" in action_module
+    assert "G.E_MANAGER:clear_queue()" in action_module
+    assert "ease_dollars(G.GAME.current_round.dollars)" in action_module
+    assert "reset_blinds()" in action_module
+    assert "G.FUNCS.cash_out" not in action_module
+
+
+def test_play_hand_treats_temporary_blind_blocks_as_retryable() -> None:
+    action_module = read_text(MOD_DIR / "balatro_mcp" / "actions.lua")
+
+    assert "same_hand_selection" in action_module
+    assert "return true, true" in action_module
+    assert '"The current blind is temporarily blocking hand play."' in action_module
+    assert 'fail("blocked", "The current blind is temporarily blocking hand play.", nil, 503, true)' in action_module
+
+
 def test_windows_scripts_cover_install_start_validate_and_package() -> None:
     scripts = {
         "install-local.ps1": [

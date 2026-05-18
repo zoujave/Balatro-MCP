@@ -41,6 +41,28 @@ local function is_pack_state(name)
     return PACK_STATES[name] == true
 end
 
+local function current_time()
+    if love and love.timer and love.timer.getTime then
+        return love.timer.getTime()
+    end
+    return os.clock()
+end
+
+local function action_lock_active(mcp)
+    if not mcp then
+        return false
+    end
+
+    local lock_until = tonumber(mcp.action_lock_until)
+    if lock_until and current_time() < lock_until then
+        return true
+    end
+
+    mcp.action_lock_until = nil
+    mcp.pending_action = nil
+    return false
+end
+
 local function primitive_table(value)
     if type(value) ~= "table" then
         return value
@@ -152,9 +174,19 @@ local function add_action(actions, name, description, args)
     }
 end
 
-local function build_actions(screen)
+local function round_eval_ready()
+    return G and G.round_eval and G.GAME and G.GAME.current_round and
+        type(G.GAME.current_round.dollars) == "number"
+end
+
+local function build_actions(screen, busy)
     local actions = {}
+    if busy then
+        return actions, {}
+    end
+
     local blind_ui_ready = G and G.blind_select and G.blind_prompt_box
+    local can_cash_out = round_eval_ready()
 
     if screen == "MENU" then
         add_action(actions, "start_run", "Start a new Balatro run.", {
@@ -190,7 +222,7 @@ local function build_actions(screen)
         })
     end
 
-    if screen == "ROUND_EVAL" then
+    if screen == "ROUND_EVAL" and can_cash_out then
         add_action(actions, "cash_out", "Collect round rewards and enter the shop.")
     end
 
@@ -331,15 +363,18 @@ end
 
 function State.build_state(mcp)
     local screen = state_name()
-    local actions, available_actions = build_actions(screen)
+    local busy = action_lock_active(mcp)
+    local actions, available_actions = build_actions(screen, busy)
 
     return {
         state_version = 1,
         mod_version = mcp and mcp.version or "0.0.0",
-        timestamp = now and now() or os.time(),
+        timestamp = os.time(),
         screen = screen,
         stage = stage_name(),
-        actionable = #available_actions > 0,
+        busy = busy,
+        pending_action = busy and mcp and mcp.pending_action or nil,
+        actionable = (not busy) and #available_actions > 0,
         available_actions = available_actions,
         actions = actions,
         session = {
