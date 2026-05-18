@@ -1,8 +1,8 @@
-# Balatro Agent
+# Balatro MCP
 
 中文 README: [README.zh-CN.md](./README.zh-CN.md)
 
-Balatro Agent is a Steamodded Balatro mod plus MCP server inspired by the architecture of STS2-Agent.
+Balatro MCP is a Steamodded Balatro mod plus MCP server inspired by the architecture of STS2-Agent.
 
 The in-game mod exposes Balatro state and actions through a local HTTP API on `http://127.0.0.1:8080`. The Python package in `mcp_server/` wraps that API as MCP tools for AI clients.
 
@@ -87,7 +87,7 @@ powershell -ExecutionPolicy Bypass -File scripts\validate-local.ps1 -LaunchGame
 
 ## Acknowledgements
 
-Balatro Agent is directly inspired by [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent). Thanks to CharTyr and the STS2-Agent project for demonstrating the practical mod-plus-MCP architecture this project adapts for Balatro.
+Balatro MCP is directly inspired by [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent). Thanks to CharTyr and the STS2-Agent project for demonstrating the practical mod-plus-MCP architecture this project adapts for Balatro.
 
 This project also depends on the Balatro modding ecosystem built by [Steamodded/smods](https://github.com/Steamodded/smods) and [Lovely Injector](https://github.com/ethangreen-dev/lovely-injector). Thanks to those projects for making Lua-side Balatro mod loading and extension possible.
 

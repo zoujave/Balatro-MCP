@@ -32,7 +32,7 @@ def create_network_app(config: NetworkServerConfig):
         return JSONResponse(
             {
                 "ok": True,
-                "service": "balatro-agent-network-mcp",
+                "service": "balatro-mcp-network",
                 "mcp_path": config.path,
                 "transport": config.transport,
                 "api_base_url": config.api_base_url,
@@ -42,7 +42,7 @@ def create_network_app(config: NetworkServerConfig):
     async def healthz(_: Request) -> JSONResponse:
         payload = {
             "ok": True,
-            "service": "balatro-agent-network-mcp",
+            "service": "balatro-mcp-network",
             "api_base_url": config.api_base_url,
         }
         try:
@@ -77,7 +77,7 @@ async def run_network_server_async(config: NetworkServerConfig) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> NetworkServerConfig:
-    parser = argparse.ArgumentParser(description="Expose Balatro Agent MCP over HTTP.")
+    parser = argparse.ArgumentParser(description="Expose Balatro MCP over HTTP.")
     parser.add_argument("--host", default=os.getenv("BALATRO_AGENT_NETWORK_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("BALATRO_AGENT_NETWORK_PORT", "8765")))
     parser.add_argument("--path", default=os.getenv("BALATRO_AGENT_NETWORK_PATH", "/mcp"))

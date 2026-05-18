@@ -5,8 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $distDir = Join-Path $repoRoot $OutputDir
-$packageRoot = Join-Path $distDir "Balatro-Agent"
-$zipPath = Join-Path $distDir "Balatro-Agent.zip"
+$packageRoot = Join-Path $distDir "Balatro-MCP"
+$zipPath = Join-Path $distDir "Balatro-MCP.zip"
 
 if (Test-Path -LiteralPath $packageRoot) {
     Remove-Item -LiteralPath $packageRoot -Recurse -Force

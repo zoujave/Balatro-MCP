@@ -62,11 +62,11 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
 def create_server(client: BalatroAgentClient | None = None) -> FastMCP:
     balatro = client or BalatroAgentClient()
     handlers = create_tool_handlers(balatro)
-    mcp = FastMCP("Balatro Agent")
+    mcp = FastMCP("Balatro MCP")
 
     @mcp.tool
     def health_check() -> dict[str, Any]:
-        """Check whether the Balatro Agent mod is loaded and reachable."""
+        """Check whether the Balatro MCP mod is loaded and reachable."""
         return handlers["health_check"]()
 
     @mcp.tool

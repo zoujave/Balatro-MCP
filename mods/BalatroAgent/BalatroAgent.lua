@@ -34,5 +34,5 @@ function Game:update(dt)
 end
 
 if sendInfoMessage then
-    sendInfoMessage("Balatro Agent loaded", "BalatroAgent")
+    sendInfoMessage("Balatro MCP loaded", "BalatroAgent")
 end

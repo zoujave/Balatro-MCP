@@ -152,7 +152,7 @@ end
 
 function HttpServer:health_payload()
     return {
-        service = "balatro-agent",
+        service = "balatro-mcp",
         version = self.agent.version or "0.0.0",
         host = self.host,
         port = self.port,

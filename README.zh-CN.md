@@ -1,8 +1,8 @@
-# Balatro Agent
+# Balatro MCP
 
 English README: [README.md](./README.md)
 
-`Balatro Agent` 是一个给《Balatro》用的游戏 Mod + MCP Server 组合，整体结构仿照 `CharTyr/STS2-Agent`：
+`Balatro MCP` 是一个给《Balatro》用的游戏 Mod + MCP Server 组合，整体结构仿照 `CharTyr/STS2-Agent`：
 
 - `mods/BalatroAgent`：Steamodded Mod，把游戏状态和可执行操作暴露成本地 HTTP API
 - `mcp_server`：把这套本地 API 包装成 MCP Server，方便接入支持 MCP 的 AI 客户端
@@ -11,7 +11,7 @@ English README: [README.md](./README.md)
 
 ### 1. 安装 Mod 依赖
 
-Balatro Agent 依赖 Balatro 的常见 Mod 环境：
+Balatro MCP 依赖 Balatro 的常见 Mod 环境：
 
 1. 安装 Lovely
 2. 安装 Steamodded/smods
@@ -42,7 +42,7 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\install-local.ps1" -BalatroP
 
 ### 2. 启动游戏并确认 Mod 生效
 
-正常启动 Balatro，让 Lovely、Steamodded 和 Balatro Agent 随游戏一起加载。
+正常启动 Balatro，让 Lovely、Steamodded 和 Balatro MCP 随游戏一起加载。
 
 然后打开：
 
@@ -50,7 +50,7 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\install-local.ps1" -BalatroP
 http://127.0.0.1:8080/health
 ```
 
-如果返回里的 `data.service` 是 `balatro-agent`，说明 Mod 已经跑起来了。
+如果返回里的 `data.service` 是 `balatro-mcp`，说明 Mod 已经跑起来了。
 
 如果 8080 已经被其他本地服务占用，可以用环境变量换端口：
 
@@ -83,7 +83,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | ie
 powershell -ExecutionPolicy Bypass -File ".\scripts\start-mcp-stdio.ps1"
 ```
 
-如果你的 Balatro Agent 使用了非默认端口：
+如果你的 Balatro MCP 使用了非默认端口：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File ".\scripts\start-mcp-stdio.ps1" -ApiBaseUrl "http://127.0.0.1:18080"
@@ -94,7 +94,7 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\start-mcp-stdio.ps1" -ApiBas
 如果客户端支持命令式 MCP 启动，把工作目录指向 `mcp_server/`，命令填：
 
 ```text
-uv run balatro-agent-mcp-server
+uv run balatro-mcp-server
 ```
 
 如果客户端更适合连接 HTTP 版 MCP，可以启动网络版：
@@ -206,7 +206,7 @@ $env:BALATRO_AGENT_PORT = "18080"
 通常说明 MCP Server 已经启动，但游戏里的 Mod 没连上。先确认：
 
 1. 游戏正在运行
-2. `/health` 返回的 `data.service` 是 `balatro-agent`
+2. `/health` 返回的 `data.service` 是 `balatro-mcp`
 3. MCP 连接的地址和 Mod 监听端口一致
 
 如果你把 Mod 改到了 18080，启动 MCP 时也要传：
@@ -232,7 +232,7 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\start-mcp-stdio.ps1" -ApiBas
 
 ## 致谢
 
-Balatro Agent 的整体思路直接参考了 [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent)。感谢 CharTyr 和 STS2-Agent 项目验证了“游戏 Mod 暴露本地 HTTP API，再由 MCP Server 包装给 AI 客户端使用”的实用架构；本项目是在这个思路上针对 Balatro 做的适配。
+Balatro MCP 的整体思路直接参考了 [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent)。感谢 CharTyr 和 STS2-Agent 项目验证了“游戏 Mod 暴露本地 HTTP API，再由 MCP Server 包装给 AI 客户端使用”的实用架构；本项目是在这个思路上针对 Balatro 做的适配。
 
 本项目也依赖 [Steamodded/smods](https://github.com/Steamodded/smods) 和 [Lovely Injector](https://github.com/ethangreen-dev/lovely-injector) 所提供的 Balatro Mod 生态。感谢这些项目让 Balatro 的 Lua 侧 Mod 加载与扩展成为可能。
 

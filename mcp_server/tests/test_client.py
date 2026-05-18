@@ -29,7 +29,7 @@ class FakeBalatroHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._write(200, {"ok": True, "data": {"service": "balatro-agent"}})
+            self._write(200, {"ok": True, "data": {"service": "balatro-mcp"}})
             return
         if self.path == "/state":
             state = self.states.pop(0) if self.states else {"screen": "MENU", "actionable": False}
@@ -68,7 +68,7 @@ def fake_server() -> str:
 def test_client_unwraps_successful_payloads(fake_server: str) -> None:
     client = BalatroAgentClient(base_url=fake_server, max_retries=0)
 
-    assert client.get_health()["service"] == "balatro-agent"
+    assert client.get_health()["service"] == "balatro-mcp"
     assert client.get_available_actions() == [{"name": "start_run"}]
 
 

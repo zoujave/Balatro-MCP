@@ -11,4 +11,4 @@ $mcpDir = Join-Path $repoRoot "mcp_server"
 
 $env:BALATRO_AGENT_API_BASE_URL = $ApiBaseUrl
 Set-Location $mcpDir
-uv run balatro-agent-network-mcp-server --host $HostName --port $Port --path $Path --api-base-url $ApiBaseUrl
+uv run balatro-network-mcp-server --host $HostName --port $Port --path $Path --api-base-url $ApiBaseUrl

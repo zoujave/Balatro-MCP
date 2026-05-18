@@ -18,7 +18,7 @@ def test_steamodded_manifest_points_to_entrypoint() -> None:
     manifest = json.loads(read_text(manifest_path))
 
     assert manifest["id"] == "BalatroAgent"
-    assert manifest["name"] == "Balatro Agent"
+    assert manifest["name"] == "Balatro MCP"
     assert manifest["main_file"] == "BalatroAgent.lua"
     assert manifest["prefix"] == "ba"
     assert "Steamodded" in manifest["dependencies"]
@@ -99,8 +99,8 @@ def test_windows_scripts_cover_install_start_validate_and_package() -> None:
             "BalatroAgent",
             "Mods",
         ],
-        "start-mcp-stdio.ps1": ["uv run balatro-agent-mcp-server"],
-        "start-mcp-network.ps1": ["uv run balatro-agent-network-mcp-server"],
+        "start-mcp-stdio.ps1": ["uv run balatro-mcp-server"],
+        "start-mcp-network.ps1": ["uv run balatro-network-mcp-server"],
         "validate-local.ps1": ["http://127.0.0.1:8080/health", "SkipGameLaunch", "LaunchGame"],
         "package-release.ps1": ["Compress-Archive", "BalatroAgent"],
     }
@@ -111,7 +111,7 @@ def test_windows_scripts_cover_install_start_validate_and_package() -> None:
             assert fragment in content
 
     validate_script = read_text(ROOT / "scripts" / "validate-local.ps1")
-    assert "balatro-agent" in validate_script
+    assert "balatro-mcp" in validate_script
     assert "BALATRO_AGENT_PORT" in validate_script
 
     package_script = read_text(ROOT / "scripts" / "package-release.ps1")

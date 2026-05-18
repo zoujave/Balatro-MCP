@@ -149,7 +149,7 @@ class BalatroAgentClient:
                 last_error = BalatroAgentApiError(
                     status_code=0,
                     code="connection_error",
-                    message=f"Cannot reach Balatro Agent at {self._base_url}.",
+                    message=f"Cannot reach Balatro MCP at {self._base_url}.",
                     details={"reason": str(exc.reason), "path": path},
                     retryable=True,
                 )

@@ -28,11 +28,11 @@ function Test-Health {
     while ((Get-Date) -lt $deadline) {
         try {
             $response = Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 2
-            if ($response.ok -eq $true -and $response.data.service -eq "balatro-agent") {
-                Write-Host "Balatro Agent health OK: $($response.data.service)"
+            if ($response.ok -eq $true -and $response.data.service -eq "balatro-mcp") {
+                Write-Host "Balatro MCP health OK: $($response.data.service)"
                 return $true
             } elseif ($response.ok -eq $true) {
-                Write-Host "Ignoring non Balatro Agent service on port ${Port}: $($response.data.service)"
+                Write-Host "Ignoring non Balatro MCP service on port ${Port}: $($response.data.service)"
             }
         } catch {
             Start-Sleep -Milliseconds 500
@@ -57,10 +57,10 @@ if ($SkipGameLaunch) {
     Write-Host "SkipGameLaunch set; optional probe uses $healthUrl. Default endpoint is $defaultHealthUrl."
     try {
         $response = Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 1
-        if ($response.ok -eq $true -and $response.data.service -eq "balatro-agent") {
-            Write-Host "Balatro Agent health OK: $($response.data.service)"
+        if ($response.ok -eq $true -and $response.data.service -eq "balatro-mcp") {
+            Write-Host "Balatro MCP health OK: $($response.data.service)"
         } elseif ($response.ok -eq $true) {
-            Write-Host "Health endpoint responded but is not balatro-agent: $($response.data.service)"
+            Write-Host "Health endpoint responded but is not balatro-mcp: $($response.data.service)"
         }
     } catch {
         Write-Host "Health endpoint not reachable during skipped launch validation."

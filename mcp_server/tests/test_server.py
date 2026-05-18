@@ -10,7 +10,7 @@ class FakeClient:
         self.actions: list[tuple[str, dict[str, Any]]] = []
 
     def get_health(self) -> dict[str, Any]:
-        return {"service": "balatro-agent"}
+        return {"service": "balatro-mcp"}
 
     def get_state(self) -> dict[str, Any]:
         return {"screen": "SHOP"}
@@ -30,7 +30,7 @@ def test_tool_handlers_delegate_to_client() -> None:
     client = FakeClient()
     handlers = create_tool_handlers(client)
 
-    assert handlers["health_check"]() == {"service": "balatro-agent"}
+    assert handlers["health_check"]() == {"service": "balatro-mcp"}
     assert handlers["get_game_state"]() == {"screen": "SHOP"}
     assert handlers["get_raw_game_state"]() == {"screen": "SHOP"}
     assert handlers["get_available_actions"]() == {"actions": [{"name": "end_shop"}]}

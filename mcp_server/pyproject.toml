@@ -1,7 +1,7 @@
 [project]
-name = "balatro-agent-mcp"
+name = "balatro-mcp"
 version = "0.1.0"
-description = "FastMCP wrapper for the local Balatro Agent mod"
+description = "FastMCP wrapper for the local Balatro MCP mod"
 readme = "../README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,8 +15,8 @@ test = [
 ]
 
 [project.scripts]
-balatro-agent-mcp-server = "balatro_agent_mcp.server:main"
-balatro-agent-network-mcp-server = "balatro_agent_mcp.network_server:main"
+balatro-mcp-server = "balatro_agent_mcp.server:main"
+balatro-network-mcp-server = "balatro_agent_mcp.network_server:main"
 
 [build-system]
 requires = ["hatchling"]

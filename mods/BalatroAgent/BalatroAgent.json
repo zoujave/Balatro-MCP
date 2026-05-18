@@ -1,8 +1,8 @@
 {
   "id": "BalatroAgent",
   "author": ["Codex"],
-  "name": "Balatro Agent",
-  "display_name": "Balatro Agent",
+  "name": "Balatro MCP",
+  "display_name": "Balatro MCP",
   "description": "Expose Balatro game state and actions over a local HTTP API for MCP-capable AI clients.",
   "prefix": "ba",
   "version": "0.1.0",
