@@ -19,8 +19,24 @@ MCP tools:
 - `get_game_state`
 - `get_raw_game_state`
 - `get_available_actions`
+- `list_legal_actions`
 - `act`
 - `wait_until_actionable`
+- `continue_run`
+- `choose_option`
+- `choose_blind`
+- `skip_choice`
+- `select_card`
+- `deselect_card`
+- `play_hand`
+- `discard_selected`
+- `end_turn`
+- `buy_item`
+- `reroll_shop`
+- `sell_joker`
+- `use_consumable`
+- `get_action_history`
+- `get_run_summary`
 
 ## Local Balatro Path
 
@@ -62,6 +78,19 @@ The generic MCP `act` tool accepts the action name plus optional arguments:
 {"action": "buy", "area": "shop_jokers", "index": 1}
 {"action": "use", "area": "consumeables", "index": 1, "card_indices": [1]}
 ```
+
+For MCP clients that prefer task-shaped tools, the explicit tools wrap the same action layer:
+
+```json
+{"tool": "continue_run", "stake": 1}
+{"tool": "choose_blind", "option_id": "small"}
+{"tool": "select_card", "index": 2}
+{"tool": "play_hand", "card_indices": [1, 2, 3, 4, 5]}
+{"tool": "buy_item", "area": "shop_jokers", "index": 1}
+{"tool": "use_consumable", "index": 1, "card_indices": [1]}
+```
+
+Card, joker, shop, and consumable indexes are 1-based and come from `get_game_state`.
 
 ## Validate
 

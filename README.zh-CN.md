@@ -139,8 +139,24 @@ MCP 工具：
 - `get_game_state`
 - `get_raw_game_state`
 - `get_available_actions`
+- `list_legal_actions`
 - `act`
 - `wait_until_actionable`
+- `continue_run`
+- `choose_option`
+- `choose_blind`
+- `skip_choice`
+- `select_card`
+- `deselect_card`
+- `play_hand`
+- `discard_selected`
+- `end_turn`
+- `buy_item`
+- `reroll_shop`
+- `sell_joker`
+- `use_consumable`
+- `get_action_history`
+- `get_run_summary`
 
 ## 动作示例
 
@@ -154,6 +170,19 @@ MCP 工具：
 {"action": "buy", "area": "shop_jokers", "index": 1}
 {"action": "use", "area": "consumeables", "index": 1, "card_indices": [1]}
 ```
+
+如果 MCP 客户端更偏好任务式工具，可以直接使用这些显式工具；它们内部仍然走同一套动作执行层：
+
+```json
+{"tool": "continue_run", "stake": 1}
+{"tool": "choose_blind", "option_id": "small"}
+{"tool": "select_card", "index": 2}
+{"tool": "play_hand", "card_indices": [1, 2, 3, 4, 5]}
+{"tool": "buy_item", "area": "shop_jokers", "index": 1}
+{"tool": "use_consumable", "index": 1, "card_indices": [1]}
+```
+
+手牌、Joker、商店物品和消耗牌的 `index` 都是从 1 开始，来源于 `get_game_state` 返回的当前状态。
 
 ## 验证
 
