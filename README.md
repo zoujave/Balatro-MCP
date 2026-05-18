@@ -1,5 +1,7 @@
 # Balatro Agent
 
+中文 README: [README.zh-CN.md](./README.zh-CN.md)
+
 Balatro Agent is a Steamodded Balatro mod plus MCP server inspired by the architecture of STS2-Agent.
 
 The in-game mod exposes Balatro state and actions through a local HTTP API on `http://127.0.0.1:8080`. The Python package in `mcp_server/` wraps that API as MCP tools for AI clients.
