@@ -15,7 +15,7 @@ DEFAULT_MAX_RETRIES = 2
 
 
 @dataclass(slots=True)
-class BalatroAgentApiError(RuntimeError):
+class BalatroMCPApiError(RuntimeError):
     status_code: int
     code: str
     message: str
@@ -31,7 +31,7 @@ class BalatroAgentApiError(RuntimeError):
         return " | ".join(parts)
 
 
-class BalatroAgentClient:
+class BalatroMCPClient:
     def __init__(
         self,
         base_url: str | None = None,
@@ -40,13 +40,13 @@ class BalatroAgentClient:
         action_timeout: float | None = None,
         max_retries: int | None = None,
     ) -> None:
-        self._base_url = (base_url or os.getenv("BALATRO_AGENT_API_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        self._read_timeout = read_timeout or float(os.getenv("BALATRO_AGENT_API_READ_TIMEOUT", str(DEFAULT_READ_TIMEOUT)))
+        self._base_url = (base_url or os.getenv("BALATRO_MCP_API_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+        self._read_timeout = read_timeout or float(os.getenv("BALATRO_MCP_API_READ_TIMEOUT", str(DEFAULT_READ_TIMEOUT)))
         self._action_timeout = action_timeout or float(
-            os.getenv("BALATRO_AGENT_API_ACTION_TIMEOUT", str(DEFAULT_ACTION_TIMEOUT))
+            os.getenv("BALATRO_MCP_API_ACTION_TIMEOUT", str(DEFAULT_ACTION_TIMEOUT))
         )
         self._max_retries = (
-            max_retries if max_retries is not None else int(os.getenv("BALATRO_AGENT_API_MAX_RETRIES", str(DEFAULT_MAX_RETRIES)))
+            max_retries if max_retries is not None else int(os.getenv("BALATRO_MCP_API_MAX_RETRIES", str(DEFAULT_MAX_RETRIES)))
         )
 
     @property
@@ -103,7 +103,7 @@ class BalatroAgentClient:
                 return last_state
             time.sleep(max(0.01, poll_interval))
 
-        raise BalatroAgentApiError(
+        raise BalatroMCPApiError(
             status_code=0,
             code="timeout",
             message="Timed out waiting for Balatro to become actionable.",
@@ -126,7 +126,7 @@ class BalatroAgentClient:
             body = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json; charset=utf-8"
 
-        last_error: BalatroAgentApiError | None = None
+        last_error: BalatroMCPApiError | None = None
         for attempt in range(self._max_retries + 1):
             if attempt > 0:
                 time.sleep(0.2 * attempt)
@@ -146,7 +146,7 @@ class BalatroAgentClient:
                 if not last_error.retryable or attempt >= self._max_retries:
                     raise last_error
             except error.URLError as exc:
-                last_error = BalatroAgentApiError(
+                last_error = BalatroMCPApiError(
                     status_code=0,
                     code="connection_error",
                     message=f"Cannot reach Balatro MCP at {self._base_url}.",
@@ -163,7 +163,7 @@ class BalatroAgentClient:
         try:
             payload = json.loads(response_body.decode("utf-8"))
         except json.JSONDecodeError as exc:
-            raise BalatroAgentApiError(
+            raise BalatroMCPApiError(
                 status_code=status_code,
                 code="invalid_response",
                 message="Server returned invalid JSON.",
@@ -171,7 +171,7 @@ class BalatroAgentClient:
 
         if not payload.get("ok", False):
             error_payload = payload.get("error", {})
-            raise BalatroAgentApiError(
+            raise BalatroMCPApiError(
                 status_code=status_code,
                 code=error_payload.get("code", "unknown_error"),
                 message=error_payload.get("message", "Request failed."),
@@ -182,13 +182,13 @@ class BalatroAgentClient:
         return payload.get("data")
 
     @classmethod
-    def _build_api_error(cls, status_code: int, response_body: bytes) -> BalatroAgentApiError:
+    def _build_api_error(cls, status_code: int, response_body: bytes) -> BalatroMCPApiError:
         try:
             cls._decode_response(status_code, response_body)
-        except BalatroAgentApiError as exc:
+        except BalatroMCPApiError as exc:
             return exc
 
-        return BalatroAgentApiError(
+        return BalatroMCPApiError(
             status_code=status_code,
             code="unknown_error",
             message="Server returned an HTTP error without an error envelope.",

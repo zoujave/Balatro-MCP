@@ -328,13 +328,13 @@ local function build_pack()
     }
 end
 
-function State.build_state(agent)
+function State.build_state(mcp)
     local screen = state_name()
     local actions, available_actions = build_actions(screen)
 
     return {
         state_version = 1,
-        mod_version = agent and agent.version or "0.0.0",
+        mod_version = mcp and mcp.version or "0.0.0",
         timestamp = now and now() or os.time(),
         screen = screen,
         stage = stage_name(),

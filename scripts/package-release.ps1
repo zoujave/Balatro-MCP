@@ -13,7 +13,7 @@ if (Test-Path -LiteralPath $packageRoot) {
 }
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $repoRoot "mods\BalatroAgent") -Destination (Join-Path $packageRoot "BalatroAgent") -Recurse
+Copy-Item -LiteralPath (Join-Path $repoRoot "mods\BalatroMCP") -Destination (Join-Path $packageRoot "BalatroMCP") -Recurse
 $mcpTarget = Join-Path $packageRoot "mcp_server"
 New-Item -ItemType Directory -Force -Path $mcpTarget | Out-Null
 robocopy (Join-Path $repoRoot "mcp_server") $mcpTarget /E /XD .venv __pycache__ .pytest_cache /XF *.pyc | Out-Null

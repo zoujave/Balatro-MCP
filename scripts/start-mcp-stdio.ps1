@@ -6,6 +6,6 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $mcpDir = Join-Path $repoRoot "mcp_server"
 
-$env:BALATRO_AGENT_API_BASE_URL = $ApiBaseUrl
+$env:BALATRO_MCP_API_BASE_URL = $ApiBaseUrl
 Set-Location $mcpDir
 uv run balatro-mcp-server

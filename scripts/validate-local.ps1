@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $appData = [Environment]::GetFolderPath("ApplicationData")
 $modsDir = Join-Path (Join-Path $appData "Balatro") "Mods"
-$targetMod = Join-Path $modsDir "BalatroAgent"
+$targetMod = Join-Path $modsDir "BalatroMCP"
 $healthUrl = "http://127.0.0.1:$Port/health"
 $defaultHealthUrl = "http://127.0.0.1:8080/health"
 
@@ -42,7 +42,7 @@ function Test-Health {
 }
 
 Assert-Path -Path $repoRoot -Message "Repository root not found."
-Assert-Path -Path (Join-Path $repoRoot "mods\BalatroAgent\BalatroAgent.json") -Message "BalatroAgent manifest missing."
+Assert-Path -Path (Join-Path $repoRoot "mods\BalatroMCP\BalatroMCP.json") -Message "BalatroMCP manifest missing."
 Assert-Path -Path (Join-Path $repoRoot "mcp_server\pyproject.toml") -Message "MCP pyproject missing."
 Assert-Path -Path $BalatroPath -Message "Balatro path not found: $BalatroPath"
 Assert-Path -Path (Join-Path $BalatroPath "Balatro.exe") -Message "Balatro.exe not found."
@@ -71,7 +71,7 @@ if ($SkipGameLaunch) {
 if ($LaunchGame) {
     $exe = Join-Path $BalatroPath "Balatro.exe"
     Write-Host "Launching Balatro from $exe"
-    $env:BALATRO_AGENT_PORT = "$Port"
+    $env:BALATRO_MCP_PORT = "$Port"
     Start-Process -FilePath $exe -WorkingDirectory $BalatroPath | Out-Null
 }
 

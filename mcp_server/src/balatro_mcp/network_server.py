@@ -9,7 +9,7 @@ import uvicorn
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from .client import BalatroAgentApiError, BalatroAgentClient
+from .client import BalatroMCPApiError, BalatroMCPClient
 from .server import create_server
 
 
@@ -24,8 +24,8 @@ class NetworkServerConfig:
 
 
 def create_network_app(config: NetworkServerConfig):
-    health_client = BalatroAgentClient(base_url=config.api_base_url, read_timeout=1.5, action_timeout=1.5, max_retries=0)
-    server = create_server(client=BalatroAgentClient(base_url=config.api_base_url))
+    health_client = BalatroMCPClient(base_url=config.api_base_url, read_timeout=1.5, action_timeout=1.5, max_retries=0)
+    server = create_server(client=BalatroMCPClient(base_url=config.api_base_url))
     app = server.http_app(path=config.path, transport=config.transport)
 
     async def root(_: Request) -> JSONResponse:
@@ -46,9 +46,9 @@ def create_network_app(config: NetworkServerConfig):
             "api_base_url": config.api_base_url,
         }
         try:
-            payload["balatro_agent"] = health_client.get_health()
+            payload["balatro_mcp"] = health_client.get_health()
             return JSONResponse(payload, status_code=200)
-        except BalatroAgentApiError as exc:
+        except BalatroMCPApiError as exc:
             payload["ok"] = False
             payload["error"] = {
                 "code": exc.code,
@@ -78,12 +78,12 @@ async def run_network_server_async(config: NetworkServerConfig) -> None:
 
 def parse_args(argv: list[str] | None = None) -> NetworkServerConfig:
     parser = argparse.ArgumentParser(description="Expose Balatro MCP over HTTP.")
-    parser.add_argument("--host", default=os.getenv("BALATRO_AGENT_NETWORK_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("BALATRO_AGENT_NETWORK_PORT", "8765")))
-    parser.add_argument("--path", default=os.getenv("BALATRO_AGENT_NETWORK_PATH", "/mcp"))
-    parser.add_argument("--transport", default=os.getenv("BALATRO_AGENT_NETWORK_TRANSPORT", "streamable-http"))
-    parser.add_argument("--api-base-url", default=os.getenv("BALATRO_AGENT_API_BASE_URL", "http://127.0.0.1:8080"))
-    parser.add_argument("--log-level", default=os.getenv("BALATRO_AGENT_NETWORK_LOG_LEVEL", "info"))
+    parser.add_argument("--host", default=os.getenv("BALATRO_MCP_NETWORK_HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("BALATRO_MCP_NETWORK_PORT", "8765")))
+    parser.add_argument("--path", default=os.getenv("BALATRO_MCP_NETWORK_PATH", "/mcp"))
+    parser.add_argument("--transport", default=os.getenv("BALATRO_MCP_NETWORK_TRANSPORT", "streamable-http"))
+    parser.add_argument("--api-base-url", default=os.getenv("BALATRO_MCP_API_BASE_URL", "http://127.0.0.1:8080"))
+    parser.add_argument("--log-level", default=os.getenv("BALATRO_MCP_NETWORK_LOG_LEVEL", "info"))
     args = parser.parse_args(argv)
     return NetworkServerConfig(
         host=args.host,

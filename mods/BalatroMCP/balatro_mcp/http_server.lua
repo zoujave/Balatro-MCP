@@ -106,10 +106,10 @@ local function parse_request(raw)
     }
 end
 
-function HttpServer.new(agent, options)
+function HttpServer.new(mcp, options)
     options = options or {}
     local self = setmetatable({
-        agent = agent,
+        mcp = mcp,
         host = options.host or DEFAULT_HOST,
         port = options.port or DEFAULT_PORT,
         clients = {},
@@ -137,7 +137,7 @@ function HttpServer:close_client(client_state)
 end
 
 function HttpServer:write_response(client_state, status, payload)
-    local body = self.agent.JSON.encode(payload)
+    local body = self.mcp.JSON.encode(payload)
     local response = table.concat({
         "HTTP/1.1 " .. tostring(status) .. " " .. (STATUS_TEXT[status] or "OK"),
         "Content-Type: application/json; charset=utf-8",
@@ -153,19 +153,19 @@ end
 function HttpServer:health_payload()
     return {
         service = "balatro-mcp",
-        version = self.agent.version or "0.0.0",
+        version = self.mcp.version or "0.0.0",
         host = self.host,
         port = self.port,
         uptime_seconds = math.max(0, now() - self.started_at),
-        state_available = self.agent.state ~= nil,
-        actions_available = self.agent.actions ~= nil,
+        state_available = self.mcp.state ~= nil,
+        actions_available = self.mcp.actions ~= nil,
         last_error = self.last_error,
     }
 end
 
 function HttpServer:state_payload()
-    if self.agent.state and self.agent.state.build_state then
-        return self.agent.state.build_state(self.agent)
+    if self.mcp.state and self.mcp.state.build_state then
+        return self.mcp.state.build_state(self.mcp)
     end
 
     return {
@@ -186,16 +186,16 @@ function HttpServer:available_actions_payload()
 end
 
 function HttpServer:action_payload(request)
-    if not self.agent.actions or not self.agent.actions.execute then
+    if not self.mcp.actions or not self.mcp.actions.execute then
         return 503, envelope_error("actions_unavailable", "Action module is not loaded yet.", nil, true)
     end
 
     local body = {}
     if request.body and request.body ~= "" then
-        body = self.agent.JSON.decode(request.body)
+        body = self.mcp.JSON.decode(request.body)
     end
 
-    local result, action_error = self.agent.actions.execute(self.agent, body or {})
+    local result, action_error = self.mcp.actions.execute(self.mcp, body or {})
     if not result and action_error then
         return action_error.status or 409, envelope_error(
             action_error.code,

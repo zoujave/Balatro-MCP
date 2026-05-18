@@ -21,18 +21,18 @@ local function state_name()
     return "UNKNOWN"
 end
 
-local function current_state(agent)
-    if agent and agent.state and agent.state.build_state then
-        return agent.state.build_state(agent)
+local function current_state(mcp)
+    if mcp and mcp.state and mcp.state.build_state then
+        return mcp.state.build_state(mcp)
     end
     return {}
 end
 
-local function ok(agent, action, message)
+local function ok(mcp, action, message)
     return {
         action = action,
         message = message or "Action queued.",
-        state = current_state(agent),
+        state = current_state(mcp),
     }
 end
 
@@ -124,7 +124,7 @@ local function fake_event(card, id)
     }
 end
 
-local function action_start_run(agent, request)
+local function action_start_run(mcp, request)
     if not G or not G.FUNCS or not G.FUNCS.start_run then
         return fail("game_unavailable", "Balatro start_run is unavailable.", nil, 503)
     end
@@ -133,10 +133,10 @@ local function action_start_run(agent, request)
         stake = tonumber(request.stake) or 1,
         seed = request.seed,
     })
-    return ok(agent, "start_run", "New run queued.")
+    return ok(mcp, "start_run", "New run queued.")
 end
 
-local function action_select_blind(agent, request)
+local function action_select_blind(mcp, request)
     if state_name() ~= "BLIND_SELECT" then
         return fail("invalid_state", "Blind selection is not active.", { screen = state_name() })
     end
@@ -154,10 +154,10 @@ local function action_select_blind(agent, request)
     end
 
     G.FUNCS.select_blind({ config = { ref_table = choice } })
-    return ok(agent, "select_blind", "Blind selection queued.")
+    return ok(mcp, "select_blind", "Blind selection queued.")
 end
 
-local function action_skip_blind(agent)
+local function action_skip_blind(mcp)
     if state_name() ~= "BLIND_SELECT" then
         return fail("invalid_state", "Blind selection is not active.", { screen = state_name() })
     end
@@ -179,18 +179,18 @@ local function action_skip_blind(agent)
     if save_run then
         save_run()
     end
-    return ok(agent, "skip_blind", "Blind skipped.")
+    return ok(mcp, "skip_blind", "Blind skipped.")
 end
 
-local function action_select_cards(agent, request)
+local function action_select_cards(mcp, request)
     local selected, err = select_hand_cards(request)
     if not selected then
         return nil, err
     end
-    return ok(agent, "select_cards", "Hand cards selected.")
+    return ok(mcp, "select_cards", "Hand cards selected.")
 end
 
-local function action_play_hand(agent, request)
+local function action_play_hand(mcp, request)
     if state_name() ~= "SELECTING_HAND" then
         return fail("invalid_state", "A hand can only be played while selecting hand cards.", { screen = state_name() })
     end
@@ -207,10 +207,10 @@ local function action_play_hand(agent, request)
     end
 
     G.FUNCS.play_cards_from_highlighted({})
-    return ok(agent, "play_hand", "Hand play queued.")
+    return ok(mcp, "play_hand", "Hand play queued.")
 end
 
-local function action_discard(agent, request)
+local function action_discard(mcp, request)
     if state_name() ~= "SELECTING_HAND" then
         return fail("invalid_state", "Cards can only be discarded while selecting hand cards.", { screen = state_name() })
     end
@@ -227,26 +227,26 @@ local function action_discard(agent, request)
     end
 
     G.FUNCS.discard_cards_from_highlighted({})
-    return ok(agent, "discard", "Discard queued.")
+    return ok(mcp, "discard", "Discard queued.")
 end
 
-local function action_cash_out(agent)
+local function action_cash_out(mcp)
     if state_name() ~= "ROUND_EVAL" then
         return fail("invalid_state", "Cash out is only available during round evaluation.", { screen = state_name() })
     end
     G.FUNCS.cash_out({ config = { button = "cash_out" } })
-    return ok(agent, "cash_out", "Cash out queued.")
+    return ok(mcp, "cash_out", "Cash out queued.")
 end
 
-local function action_end_shop(agent)
+local function action_end_shop(mcp)
     if state_name() ~= "SHOP" then
         return fail("invalid_state", "Shop is not active.", { screen = state_name() })
     end
     G.FUNCS.toggle_shop({})
-    return ok(agent, "end_shop", "Shop exit queued.")
+    return ok(mcp, "end_shop", "Shop exit queued.")
 end
 
-local function action_reroll_shop(agent)
+local function action_reroll_shop(mcp)
     if state_name() ~= "SHOP" then
         return fail("invalid_state", "Shop is not active.", { screen = state_name() })
     end
@@ -256,18 +256,18 @@ local function action_reroll_shop(agent)
         return fail("not_affordable", "Shop reroll is not affordable.")
     end
     G.FUNCS.reroll_shop({})
-    return ok(agent, "reroll_shop", "Shop reroll queued.")
+    return ok(mcp, "reroll_shop", "Shop reroll queued.")
 end
 
-local function action_reroll_boss(agent)
+local function action_reroll_boss(mcp)
     if state_name() ~= "BLIND_SELECT" then
         return fail("invalid_state", "Blind selection is not active.", { screen = state_name() })
     end
     G.FUNCS.reroll_boss({})
-    return ok(agent, "reroll_boss", "Boss reroll queued.")
+    return ok(mcp, "reroll_boss", "Boss reroll queued.")
 end
 
-local function action_buy(agent, request)
+local function action_buy(mcp, request)
     if state_name() ~= "SHOP" then
         return fail("invalid_state", "Shop is not active.", { screen = state_name() })
     end
@@ -283,10 +283,10 @@ local function action_buy(agent, request)
     else
         G.FUNCS.buy_from_shop(event)
     end
-    return ok(agent, "buy", "Shop purchase queued.")
+    return ok(mcp, "buy", "Shop purchase queued.")
 end
 
-local function action_use(agent, request)
+local function action_use(mcp, request)
     local area_name = request.area
     if not area_name then
         area_name = (state_name():find("_PACK") and "pack") or "consumeables"
@@ -303,10 +303,10 @@ local function action_use(agent, request)
     end
 
     G.FUNCS.use_card(fake_event(card))
-    return ok(agent, "use", "Use card queued.")
+    return ok(mcp, "use", "Use card queued.")
 end
 
-local function action_sell(agent, request)
+local function action_sell(mcp, request)
     local area_name = request.area or "jokers"
     local card, err = get_card_from_area(area_name, get_index(request))
     if not card then
@@ -317,29 +317,29 @@ local function action_sell(agent, request)
     end
 
     card:sell_card()
-    return ok(agent, "sell", "Card sold.")
+    return ok(mcp, "sell", "Card sold.")
 end
 
-local function action_skip_booster(agent)
+local function action_skip_booster(mcp)
     local screen = state_name()
     if not screen:find("_PACK") then
         return fail("invalid_state", "No booster pack is open.", { screen = screen })
     end
     G.FUNCS.skip_booster({})
-    return ok(agent, "skip_booster", "Booster skipped.")
+    return ok(mcp, "skip_booster", "Booster skipped.")
 end
 
-local function action_sort_hand(agent, request)
+local function action_sort_hand(mcp, request)
     local mode = request.mode or request.sort or "value"
     if mode == "suit" then
         G.FUNCS.sort_hand_suit({})
     else
         G.FUNCS.sort_hand_value({})
     end
-    return ok(agent, "sort_hand", "Hand sorted.")
+    return ok(mcp, "sort_hand", "Hand sorted.")
 end
 
-local function action_return_to_menu(agent)
+local function action_return_to_menu(mcp)
     if not G then
         return fail("game_unavailable", "Balatro game object is unavailable.", nil, 503)
     end
@@ -353,7 +353,7 @@ local function action_return_to_menu(agent)
     if G.main_menu then
         G:main_menu("game")
     end
-    return ok(agent, "return_to_menu", "Returned to menu.")
+    return ok(mcp, "return_to_menu", "Returned to menu.")
 end
 
 local HANDLERS = {
@@ -375,7 +375,7 @@ local HANDLERS = {
     return_to_menu = action_return_to_menu,
 }
 
-function Actions.execute(agent, request)
+function Actions.execute(mcp, request)
     request = request or {}
     local action = request.action or request.name
     if type(action) ~= "string" or action == "" then
@@ -387,7 +387,7 @@ function Actions.execute(agent, request)
         return fail("unknown_action", "Unknown action.", { action = action }, 404)
     end
 
-    return handler(agent, request)
+    return handler(mcp, request)
 end
 
 return Actions

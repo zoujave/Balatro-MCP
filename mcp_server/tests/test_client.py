@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from balatro_agent_mcp.client import BalatroAgentApiError, BalatroAgentClient
+from balatro_mcp.client import BalatroMCPApiError, BalatroMCPClient
 
 
 class FakeBalatroHandler(BaseHTTPRequestHandler):
@@ -66,14 +66,14 @@ def fake_server() -> str:
 
 
 def test_client_unwraps_successful_payloads(fake_server: str) -> None:
-    client = BalatroAgentClient(base_url=fake_server, max_retries=0)
+    client = BalatroMCPClient(base_url=fake_server, max_retries=0)
 
     assert client.get_health()["service"] == "balatro-mcp"
     assert client.get_available_actions() == [{"name": "start_run"}]
 
 
 def test_client_posts_actions(fake_server: str) -> None:
-    client = BalatroAgentClient(base_url=fake_server, max_retries=0)
+    client = BalatroMCPClient(base_url=fake_server, max_retries=0)
 
     result = client.execute_action("play_hand", card_indices=[1, 2, 3])
 
@@ -92,9 +92,9 @@ def test_client_posts_actions(fake_server: str) -> None:
 
 
 def test_client_raises_api_error(fake_server: str) -> None:
-    client = BalatroAgentClient(base_url=fake_server, max_retries=0)
+    client = BalatroMCPClient(base_url=fake_server, max_retries=0)
 
-    with pytest.raises(BalatroAgentApiError) as exc_info:
+    with pytest.raises(BalatroMCPApiError) as exc_info:
         client._request("GET", "/broken")
 
     assert exc_info.value.status_code == 409
@@ -107,7 +107,7 @@ def test_wait_until_actionable_polls_until_state_is_ready(fake_server: str) -> N
         {"screen": "MENU", "actionable": False},
         {"screen": "SELECTING_HAND", "actionable": True, "available_actions": ["play_hand"]},
     ]
-    client = BalatroAgentClient(base_url=fake_server, max_retries=0)
+    client = BalatroMCPClient(base_url=fake_server, max_retries=0)
 
     state = client.wait_until_actionable(timeout=2, poll_interval=0.01)
 

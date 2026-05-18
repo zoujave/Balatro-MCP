@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from balatro_agent_mcp.server import create_tool_handlers
+from balatro_mcp.server import create_tool_handlers
 
 
 class FakeClient:

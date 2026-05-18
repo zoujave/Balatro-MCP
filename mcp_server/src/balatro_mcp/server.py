@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from fastmcp import FastMCP
 
-from .client import BalatroAgentClient
+from .client import BalatroMCPClient
 
 ToolHandler = Callable[..., dict[str, Any]]
 
@@ -59,8 +59,8 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
     }
 
 
-def create_server(client: BalatroAgentClient | None = None) -> FastMCP:
-    balatro = client or BalatroAgentClient()
+def create_server(client: BalatroMCPClient | None = None) -> FastMCP:
+    balatro = client or BalatroMCPClient()
     handlers = create_tool_handlers(balatro)
     mcp = FastMCP("Balatro MCP")
 
@@ -117,7 +117,7 @@ def create_server(client: BalatroAgentClient | None = None) -> FastMCP:
 
 def main() -> None:
     server = create_server()
-    transport = os.getenv("BALATRO_AGENT_MCP_TRANSPORT", "stdio")
+    transport = os.getenv("BALATRO_MCP_TRANSPORT", "stdio")
     server.run(transport=transport)
 
 

@@ -4,7 +4,7 @@ English README: [README.md](./README.md)
 
 `Balatro MCP` 是一个给《Balatro》用的游戏 Mod + MCP Server 组合，整体结构仿照 `CharTyr/STS2-Agent`：
 
-- `mods/BalatroAgent`：Steamodded Mod，把游戏状态和可执行操作暴露成本地 HTTP API
+- `mods/BalatroMCP`：Steamodded Mod，把游戏状态和可执行操作暴露成本地 HTTP API
 - `mcp_server`：把这套本地 API 包装成 MCP Server，方便接入支持 MCP 的 AI 客户端
 
 ## 快速开始
@@ -15,7 +15,7 @@ Balatro MCP 依赖 Balatro 的常见 Mod 环境：
 
 1. 安装 Lovely
 2. 安装 Steamodded/smods
-3. 把 `mods/BalatroAgent` 安装到 Balatro 的 Mods 目录
+3. 把 `mods/BalatroMCP` 安装到 Balatro 的 Mods 目录
 
 本机默认 Balatro 目录是：
 
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\install-local.ps1" -BalatroP
 ```text
 %AppData%\Balatro\Mods\
   smods\
-  BalatroAgent\
-    BalatroAgent.json
-    BalatroAgent.lua
-    balatro_agent\
+  BalatroMCP\
+    BalatroMCP.json
+    BalatroMCP.lua
+    balatro_mcp\
 ```
 
 ### 2. 启动游戏并确认 Mod 生效
@@ -55,7 +55,7 @@ http://127.0.0.1:8080/health
 如果 8080 已经被其他本地服务占用，可以用环境变量换端口：
 
 ```powershell
-$env:BALATRO_AGENT_PORT = "18080"
+$env:BALATRO_MCP_PORT = "18080"
 ```
 
 然后检查：
@@ -111,7 +111,7 @@ http://127.0.0.1:8765/mcp
 
 ## 当前能做什么
 
-当前 `main` 分支提供的是一套可验证、可实际进入游戏执行的基础 Agent 接口：
+当前 `main` 分支提供的是一套可验证、可实际进入游戏执行的基础 MCP 接口：
 
 - 读取当前游戏状态
 - 获取当前可执行动作
@@ -192,13 +192,13 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\validate-local.ps1" -LaunchG
 1. Balatro 是否正在运行
 2. Lovely 是否安装到 Balatro 游戏目录
 3. Steamodded/smods 是否在 `%AppData%\Balatro\Mods`
-4. `BalatroAgent` 是否在 `%AppData%\Balatro\Mods\BalatroAgent`
+4. `BalatroMCP` 是否在 `%AppData%\Balatro\Mods\BalatroMCP`
 5. 8080 端口是否被其他程序占用
 
 如果端口被占用，用：
 
 ```powershell
-$env:BALATRO_AGENT_PORT = "18080"
+$env:BALATRO_MCP_PORT = "18080"
 ```
 
 ### MCP 能启动，但读不到游戏状态
@@ -223,7 +223,7 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\start-mcp-stdio.ps1" -ApiBas
 
 ## 仓库结构
 
-- `mods/BalatroAgent/`：Balatro Steamodded Mod
+- `mods/BalatroMCP/`：Balatro Steamodded Mod
 - `mcp_server/`：MCP Server 源码
 - `scripts/`：安装、启动、验证、打包脚本
 - `tests/`：静态和结构测试

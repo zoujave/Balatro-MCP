@@ -6,11 +6,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$sourceMod = Join-Path $repoRoot "mods\BalatroAgent"
+$sourceMod = Join-Path $repoRoot "mods\BalatroMCP"
 $appData = [Environment]::GetFolderPath("ApplicationData")
 $balatroAppData = Join-Path $appData "Balatro"
 $modsDir = Join-Path $balatroAppData "Mods"
-$targetMod = Join-Path $modsDir "BalatroAgent"
+$targetMod = Join-Path $modsDir "BalatroMCP"
 
 if (-not (Test-Path -LiteralPath $BalatroPath)) {
     throw "Balatro path not found: $BalatroPath"
@@ -29,7 +29,7 @@ New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
 
 if (Test-Path -LiteralPath $targetMod) {
     if (-not $Force) {
-        Write-Host "Replacing existing BalatroAgent mod at $targetMod"
+        Write-Host "Replacing existing BalatroMCP mod at $targetMod"
     }
     $resolvedTarget = (Resolve-Path -LiteralPath $targetMod).Path
     if ($resolvedTarget -notlike "$modsDir*") {
@@ -57,5 +57,5 @@ if (-not $steamodded) {
     Write-Warning "Steamodded/smods was not found in $modsDir. Install it before launching the mod."
 }
 
-Write-Host "Installed BalatroAgent to $targetMod"
+Write-Host "Installed BalatroMCP to $targetMod"
 Write-Host "AppData Mods directory: $modsDir"
