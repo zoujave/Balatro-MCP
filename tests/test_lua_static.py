@@ -91,6 +91,25 @@ def test_action_module_exposes_core_balatro_actions() -> None:
     assert "G:main_menu" in action_module
 
 
+def test_select_blind_uses_current_blind_config_not_raw_key() -> None:
+    action_module = read_text(MOD_DIR / "balatro_mcp" / "actions.lua")
+
+    assert "not G.blind_select or not G.blind_prompt_box" in action_module
+    assert "state == \"Select\"" in action_module
+    assert "local choice = choice_key and G.P_BLINDS and G.P_BLINDS[choice_key]" in action_module
+    assert "get_UIE_by_ID(\"select_blind_button\")" in action_module
+    assert "G.FUNCS.select_blind(select_button)" in action_module
+
+
+def test_state_only_exposes_ui_backed_actions_when_ready() -> None:
+    state_module = read_text(MOD_DIR / "balatro_mcp" / "state.lua")
+
+    assert 'if screen == "MENU" then' in state_module
+    assert 'screen == "SPLASH"' not in state_module
+    assert "local blind_ui_ready = G and G.blind_select and G.blind_prompt_box" in state_module
+    assert 'if screen == "BLIND_SELECT" and blind_ui_ready then' in state_module
+
+
 def test_windows_scripts_cover_install_start_validate_and_package() -> None:
     scripts = {
         "install-local.ps1": [
@@ -113,6 +132,10 @@ def test_windows_scripts_cover_install_start_validate_and_package() -> None:
     validate_script = read_text(ROOT / "scripts" / "validate-local.ps1")
     assert "balatro-mcp" in validate_script
     assert "BALATRO_MCP_PORT" in validate_script
+
+    install_script = read_text(ROOT / "scripts" / "install-local.ps1")
+    assert "BalatroAgent" in install_script
+    assert "Removed legacy BalatroAgent" in install_script
 
     package_script = read_text(ROOT / "scripts" / "package-release.ps1")
     assert ".venv" in package_script

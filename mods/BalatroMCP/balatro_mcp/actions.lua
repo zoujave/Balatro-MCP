@@ -1,11 +1,12 @@
 local Actions = {}
 
-local function fail(code, message, details, status)
+local function fail(code, message, details, status, retryable)
     return nil, {
         code = code or "invalid_action",
         message = message or "Action is not available.",
         details = details,
         status = status or 409,
+        retryable = retryable and true or false,
     }
 end
 
@@ -124,6 +125,47 @@ local function fake_event(card, id)
     }
 end
 
+local function get_blind_choice_key(request)
+    if not G or not G.GAME or not G.GAME.round_resets then
+        return nil
+    end
+
+    local requested = request.blind
+    if requested and requested ~= "" then
+        local requested_lower = string.lower(tostring(requested))
+        for _, key in ipairs({ "Small", "Big", "Boss" }) do
+            if string.lower(key) == requested_lower then
+                return key
+            end
+        end
+    end
+
+    if request.option_index then
+        return ({ "Small", "Big", "Boss" })[tonumber(request.option_index)]
+    end
+
+    if G.GAME.blind_on_deck and G.GAME.round_resets.blind_choices[G.GAME.blind_on_deck] then
+        return G.GAME.blind_on_deck
+    end
+
+    for _, key in ipairs({ "Small", "Big", "Boss" }) do
+        local state = G.GAME.round_resets.blind_states and G.GAME.round_resets.blind_states[key]
+        if state == "Select" then
+            return key
+        end
+    end
+
+    return nil
+end
+
+local function get_blind_select_button(blind_key)
+    local choice_box = G.blind_select_opts and G.blind_select_opts[string.lower(tostring(blind_key or ""))]
+    if choice_box and choice_box.get_UIE_by_ID then
+        return choice_box:get_UIE_by_ID("select_blind_button")
+    end
+    return nil
+end
+
 local function action_start_run(mcp, request)
     if not G or not G.FUNCS or not G.FUNCS.start_run then
         return fail("game_unavailable", "Balatro start_run is unavailable.", nil, 503)
@@ -141,25 +183,39 @@ local function action_select_blind(mcp, request)
         return fail("invalid_state", "Blind selection is not active.", { screen = state_name() })
     end
 
-    local blind_key = request.blind
-    if not blind_key and request.option_index then
-        blind_key = ({ "Small", "Big", "Boss" })[tonumber(request.option_index)]
+    if not G.blind_select or not G.blind_prompt_box then
+        return fail("not_ready", "Blind selection UI is not ready yet.", nil, 503, true)
     end
-    blind_key = blind_key or (G.GAME and G.GAME.blind_on_deck)
 
-    local choice = G.GAME and G.GAME.round_resets and G.GAME.round_resets.blind_choices and
-        G.GAME.round_resets.blind_choices[blind_key]
+    local blind_key = get_blind_choice_key(request)
+    local choice_key = blind_key and G.GAME.round_resets.blind_choices[blind_key]
+    local choice = choice_key and G.P_BLINDS and G.P_BLINDS[choice_key]
     if not choice then
         return fail("invalid_blind", "Requested blind is not available.", { blind = blind_key })
     end
 
-    G.FUNCS.select_blind({ config = { ref_table = choice } })
+    local state = G.GAME.round_resets.blind_states and G.GAME.round_resets.blind_states[blind_key]
+    if state ~= "Select" and blind_key ~= G.GAME.blind_on_deck then
+        return fail("invalid_blind", "Requested blind is not the current selectable blind.", { blind = blind_key, state = state })
+    end
+
+    local select_button = get_blind_select_button(blind_key)
+    if not select_button or not select_button.UIBox then
+        return fail("not_ready", "Blind select button is not ready yet.", nil, 503, true)
+    end
+
+    select_button.config.ref_table = select_button.config.ref_table or choice
+    G.FUNCS.select_blind(select_button)
     return ok(mcp, "select_blind", "Blind selection queued.")
 end
 
 local function action_skip_blind(mcp)
     if state_name() ~= "BLIND_SELECT" then
         return fail("invalid_state", "Blind selection is not active.", { screen = state_name() })
+    end
+
+    if not G.blind_select or not G.blind_prompt_box then
+        return fail("not_ready", "Blind selection UI is not ready yet.", nil, 503, true)
     end
 
     local skipped = G.GAME.blind_on_deck or "Small"

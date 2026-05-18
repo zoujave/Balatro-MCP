@@ -154,15 +154,16 @@ end
 
 local function build_actions(screen)
     local actions = {}
+    local blind_ui_ready = G and G.blind_select and G.blind_prompt_box
 
-    if screen == "MENU" or screen == "SPLASH" or screen == "DEMO_CTA" then
+    if screen == "MENU" then
         add_action(actions, "start_run", "Start a new Balatro run.", {
             { name = "stake", type = "number", required = false },
             { name = "seed", type = "string", required = false },
         })
     end
 
-    if screen == "BLIND_SELECT" then
+    if screen == "BLIND_SELECT" and blind_ui_ready then
         add_action(actions, "select_blind", "Select the current blind on deck.", {
             { name = "blind", type = "string", required = false },
         })

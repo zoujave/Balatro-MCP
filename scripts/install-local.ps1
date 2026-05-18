@@ -11,6 +11,7 @@ $appData = [Environment]::GetFolderPath("ApplicationData")
 $balatroAppData = Join-Path $appData "Balatro"
 $modsDir = Join-Path $balatroAppData "Mods"
 $targetMod = Join-Path $modsDir "BalatroMCP"
+$legacyMod = Join-Path $modsDir "BalatroAgent"
 
 if (-not (Test-Path -LiteralPath $BalatroPath)) {
     throw "Balatro path not found: $BalatroPath"
@@ -36,6 +37,15 @@ if (Test-Path -LiteralPath $targetMod) {
         throw "Refusing to remove unexpected path: $resolvedTarget"
     }
     Remove-Item -LiteralPath $resolvedTarget -Recurse -Force
+}
+
+if (Test-Path -LiteralPath $legacyMod) {
+    $resolvedLegacy = (Resolve-Path -LiteralPath $legacyMod).Path
+    if ($resolvedLegacy -notlike "$modsDir*") {
+        throw "Refusing to remove unexpected legacy path: $resolvedLegacy"
+    }
+    Remove-Item -LiteralPath $resolvedLegacy -Recurse -Force
+    Write-Host "Removed legacy BalatroAgent mod at $resolvedLegacy"
 }
 
 Copy-Item -LiteralPath $sourceMod -Destination $targetMod -Recurse -Force
