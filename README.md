@@ -89,6 +89,8 @@ powershell -ExecutionPolicy Bypass -File scripts\validate-local.ps1 -LaunchGame
 
 Balatro Agent is directly inspired by [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent). Thanks to CharTyr and the STS2-Agent project for demonstrating the practical mod-plus-MCP architecture this project adapts for Balatro.
 
+This project also depends on the Balatro modding ecosystem built by [Steamodded/smods](https://github.com/Steamodded/smods) and [Lovely Injector](https://github.com/ethangreen-dev/lovely-injector). Thanks to those projects for making Lua-side Balatro mod loading and extension possible.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE).

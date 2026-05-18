@@ -234,6 +234,8 @@ powershell -ExecutionPolicy Bypass -File ".\scripts\start-mcp-stdio.ps1" -ApiBas
 
 Balatro Agent 的整体思路直接参考了 [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent)。感谢 CharTyr 和 STS2-Agent 项目验证了“游戏 Mod 暴露本地 HTTP API，再由 MCP Server 包装给 AI 客户端使用”的实用架构；本项目是在这个思路上针对 Balatro 做的适配。
 
+本项目也依赖 [Steamodded/smods](https://github.com/Steamodded/smods) 和 [Lovely Injector](https://github.com/ethangreen-dev/lovely-injector) 所提供的 Balatro Mod 生态。感谢这些项目让 Balatro 的 Lua 侧 Mod 加载与扩展成为可能。
+
 ## License
 
 本项目使用 MIT License。详见 [LICENSE](./LICENSE)。
