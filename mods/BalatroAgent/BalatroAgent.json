@@ -1,0 +1,14 @@
+{
+  "id": "BalatroAgent",
+  "author": ["Codex"],
+  "name": "Balatro Agent",
+  "display_name": "Balatro Agent",
+  "description": "Expose Balatro game state and actions over a local HTTP API for MCP-capable AI clients.",
+  "prefix": "ba",
+  "version": "0.1.0",
+  "main_file": "BalatroAgent.lua",
+  "priority": 0,
+  "badge_colour": "2E86ABFF",
+  "badge_text_colour": "FFFFFFFF",
+  "dependencies": ["Steamodded"]
+}
