@@ -84,3 +84,11 @@ In-game smoke test:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\validate-local.ps1 -LaunchGame
 ```
+
+## Acknowledgements
+
+Balatro Agent is directly inspired by [CharTyr/STS2-Agent](https://github.com/CharTyr/STS2-Agent). Thanks to CharTyr and the STS2-Agent project for demonstrating the practical mod-plus-MCP architecture this project adapts for Balatro.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE).
