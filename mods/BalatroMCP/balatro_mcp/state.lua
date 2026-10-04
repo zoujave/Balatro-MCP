@@ -361,6 +361,25 @@ local function build_pack()
     }
 end
 
+local function build_decks()
+    local result = {}
+    local pool = G and G.P_CENTER_POOLS and G.P_CENTER_POOLS.Back or {}
+    for _, center in ipairs(pool) do
+        if not center.omit and not center.wip and not center.demo then
+            result[#result + 1] = {
+                key = center.key,
+                name = center.name,
+                order = center.order,
+                unlocked = center.unlocked and true or false,
+                discovered = center.discovered and true or false,
+                unlock_condition = primitive_table(center.unlock_condition or {}),
+            }
+        end
+    end
+    table.sort(result, function(a, b) return (a.order or 0) < (b.order or 0) end)
+    return result
+end
+
 function State.build_state(mcp)
     local screen = state_name()
     local busy = action_lock_active(mcp)
@@ -382,6 +401,7 @@ function State.build_state(mcp)
             paused = G and G.SETTINGS and G.SETTINGS.paused and true or false,
             speed = G and G.SETTINGS and G.SETTINGS.GAMESPEED,
         },
+        decks = build_decks(),
         run = build_run(),
         blind = build_blind(),
         hand = {

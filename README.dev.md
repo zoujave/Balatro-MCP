@@ -44,3 +44,14 @@ MCP 地址为 http://127.0.0.1:8765/mcp，健康检查为 /healthz。游戏 API 
 - 先记录牌面和期望动作，再修改代码、运行测试、进行实际游戏验证。
 - upstream 指向上游，在自己的 codex/ 开发分支提交改动。
 - 游戏文件、存档和本机状态快照不提交到 GitHub。
+
+## 牌组测试配置
+
+MCP 的游戏状态现在包含 decks，列出普通牌组的 key、unlocked 和解锁条件。
+如需用现有存档测试全部 15 个原版牌组，可先预览修改范围：
+
+    .\.venv\Scripts\python.exe .\scripts\unlock-decks.py --profile 2
+
+正常关闭游戏后，加上 --apply 才会写入。脚本先备份整个指定配置及 settings.jkr，
+只修改 meta.jkr 中普通牌组的 unlocked 标记，保留其他收集进度、通关记录和赌注进度。
+备份和校验记录位于 local\backups。恢复时先关闭游戏，再从对应备份恢复 meta.jkr。
