@@ -35,6 +35,7 @@ local function is_pack_state(name)
         TAROT_PACK = true,
         PLANET_PACK = true,
         SPECTRAL_PACK = true,
+        SMODS_BOOSTER_OPENED = true,
         STANDARD_PACK = true,
         BUFFOON_PACK = true,
     }
@@ -63,7 +64,8 @@ local function action_lock_active(mcp)
     return false
 end
 
-local function primitive_table(value)
+local function primitive_table(value, depth)
+    depth = depth or 0
     if type(value) ~= "table" then
         return value
     end
@@ -73,6 +75,8 @@ local function primitive_table(value)
         local item_type = type(item)
         if item_type == "string" or item_type == "number" or item_type == "boolean" then
             result[key] = item
+        elseif item_type == "table" and depth < 3 then
+            result[key] = primitive_table(item, depth + 1)
         end
     end
     return result
@@ -175,8 +179,19 @@ local function add_action(actions, name, description, args)
 end
 
 local function round_eval_ready()
-    return G and G.round_eval and G.GAME and G.GAME.current_round and
-        type(G.GAME.current_round.dollars) == "number"
+    if not (G and G.round_eval and G.GAME and G.GAME.current_round and
+        type(G.GAME.current_round.dollars) == "number") then
+        return false
+    end
+    for _, box in ipairs(G.I and G.I.UIBOX or {}) do
+        if type(box.get_UIE_by_ID) == "function" then
+            local button = box:get_UIE_by_ID("cash_out_button")
+            if button and button.config and button.config.button == "cash_out" then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 local function build_actions(screen, busy)
@@ -342,6 +357,10 @@ local function build_run()
         reroll_cost = round.reroll_cost,
         free_rerolls = round.free_rerolls,
         current_hand = primitive_table(round.current_hand or {}),
+        hand_levels = primitive_table(game.hands or {}),
+        round = game.round,
+        round_payout = round.dollars,
+        cash_out_ready = round_eval_ready(),
     }
 end
 
@@ -359,6 +378,14 @@ local function build_pack()
         size = G and G.GAME and G.GAME.pack_size,
         cards = area_cards(G and G.pack_cards),
     }
+end
+
+local function build_tags()
+    local result = {}
+    for _, tag in ipairs(G and G.GAME and G.GAME.tags or {}) do
+        result[#result + 1] = { key = tag.key, name = tag.name, triggered = tag.triggered and true or false, config = primitive_table(tag.config or {}), ability = primitive_table(tag.ability or {}) }
+    end
+    return result
 end
 
 local function build_decks()
@@ -402,6 +429,7 @@ function State.build_state(mcp)
             speed = G and G.SETTINGS and G.SETTINGS.GAMESPEED,
         },
         decks = build_decks(),
+        tags = build_tags(),
         run = build_run(),
         blind = build_blind(),
         hand = {

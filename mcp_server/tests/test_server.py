@@ -202,3 +202,19 @@ def test_fastmcp_server_registers_reference_style_tools() -> None:
         "get_run_summary",
     ]:
         assert name in names
+
+
+def test_steamodded_booster_options_are_not_mistaken_for_blinds() -> None:
+    client = FakeClient()
+    client.state["screen"] = "SMODS_BOOSTER_OPENED"
+    handlers = create_tool_handlers(client)
+    for option in ["1", "2", "3"]:
+        handlers["choose_option"](option)
+        action, params = client.actions[-1]
+        assert action == "use"
+        assert params["area"] == "pack"
+        assert params["index"] == int(option)
+    handlers["skip_choice"]()
+    assert client.actions[-1][0] == "skip_booster"
+    handlers["continue_run"]()
+    assert client.actions[-1][0] == "skip_booster"

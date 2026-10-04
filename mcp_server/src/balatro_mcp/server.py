@@ -9,7 +9,7 @@ from .client import BalatroMCPClient
 
 ToolHandler = Callable[..., dict[str, Any]]
 
-PACK_SCREENS = {"TAROT_PACK", "PLANET_PACK", "SPECTRAL_PACK", "STANDARD_PACK", "BUFFOON_PACK"}
+PACK_SCREENS = {"SMODS_BOOSTER_OPENED", "TAROT_PACK", "PLANET_PACK", "SPECTRAL_PACK", "STANDARD_PACK", "BUFFOON_PACK"}
 BLIND_OPTIONS = {
     "small": "Small",
     "small_blind": "Small",

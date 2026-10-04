@@ -133,11 +133,12 @@ def test_cash_out_waits_for_round_eval_payout_to_finish() -> None:
     assert 'if screen == "ROUND_EVAL" and can_cash_out then' in state_module
     assert "current_round.dollars" in state_module
     assert "current_round.dollars" in action_module
-    assert "G.STATE = G.STATES.SHOP" in action_module
-    assert "G.E_MANAGER:clear_queue()" in action_module
-    assert "ease_dollars(G.GAME.current_round.dollars)" in action_module
-    assert "reset_blinds()" in action_module
-    assert "G.FUNCS.cash_out" not in action_module
+    assert 'get_UIE_by_ID("cash_out_button")' in action_module
+    assert 'get_UIE_by_ID("cash_out_button")' in state_module
+    assert "pcall(G.FUNCS.cash_out, button)" in action_module
+    cash_out = action_module.split("local function action_cash_out(mcp)", 1)[1].split("local function action_end_shop", 1)[0]
+    assert "clear_queue" not in cash_out
+    assert "ease_dollars" not in cash_out
 
 
 def test_play_hand_treats_temporary_blind_blocks_as_retryable() -> None:
