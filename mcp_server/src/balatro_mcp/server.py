@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import os
+import time
+import uuid
 from typing import Any, Callable
 
 from fastmcp import FastMCP
 
 from .client import BalatroMCPClient
+from .runtime import AssistantRuntime, compact_state
+from . import analysis
 
 ToolHandler = Callable[..., dict[str, Any]]
 
@@ -24,8 +28,17 @@ BLIND_OPTIONS = {
 MAX_HISTORY = 200
 
 
-def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
+def create_tool_handlers(client: Any, runtime: AssistantRuntime | None = None) -> dict[str, Callable[..., Any]]:
     action_history: list[dict[str, Any]] = []
+    assistant = runtime or AssistantRuntime()
+
+    def _read_state() -> dict[str, Any]:
+        return assistant.observe(client.get_state())
+
+    def _analysis_result(tool: str, params: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+        result["scoring_data"] = assistant.catalog.scoring_data()
+        assistant.write("analysis", tool=tool, params=params, result=result, strategy=assistant.config["strategy"])
+        return result
 
     def _screen_name(state: dict[str, Any]) -> str:
         return str(state.get("screen") or "").upper()
@@ -49,7 +62,7 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
         return normalized
 
     def _highlighted_indices() -> list[int]:
-        state = client.get_state()
+        state = _read_state()
         hand = state.get("hand") if isinstance(state.get("hand"), dict) else {}
         return _normalize_indices(hand.get("highlighted_indices"))
 
@@ -75,18 +88,40 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
         seed: str | None = None,
         stake: int | None = None,
         blind: str | None = None,
+        expected_revision: str | None = None,
+        card_uids: list[str] | None = None,
+        control_mode: str | None = None,
     ) -> dict[str, Any]:
-        result = client.execute_action(
-            action,
-            area=area,
-            index=index,
-            card_indices=card_indices,
-            mode=mode,
-            seed=seed,
-            stake=stake,
-            blind=blind,
-            client_context={"source": "mcp", "tool_name": tool_name},
-        )
+        started = time.monotonic()
+        before = assistant.last_state or {}
+        params = {"area": area, "index": index, "card_indices": card_indices, "mode": mode,
+                  "seed": seed, "stake": stake, "blind": blind, "card_uids": card_uids,
+                  "expected_revision": expected_revision, "control_mode": control_mode}
+        planned_revision = expected_revision or (before.get("revision") if action != "set_control_mode" else None)
+        try:
+            before = _read_state()
+            configured_mode = assistant.config["control_mode"]
+            game_mode = before.get("control", {}).get("mode", "auto")
+            active_mode = "assist" if game_mode == "assist" or configured_mode == "assist" else "auto"
+            if action != "set_control_mode" and active_mode == "assist":
+                raise ValueError("Assist mode: the human controls the game. Switch explicitly to auto before acting.")
+            if planned_revision and planned_revision != before.get("revision"):
+                raise ValueError("Stale game state: reread state before executing this action")
+            extra: dict[str, Any] = {}
+            context = {"source": "mcp", "tool_name": tool_name}
+            if before.get("revision"):
+                extra["expected_revision"] = before["revision"]
+                context["request_id"] = uuid.uuid4().hex
+            if card_uids is not None: extra["card_uids"] = card_uids
+            if control_mode is not None: extra["control_mode"] = control_mode
+            result = client.execute_action(action, area=area, index=index, card_indices=card_indices,
+                                           mode=mode, seed=seed, stake=stake, blind=blind,
+                                           client_context=context, **extra)
+        except Exception as exc:
+            assistant.record_action(tool_name, action, params, before, error=exc, elapsed_ms=(time.monotonic() - started) * 1000)
+            raise
+        assistant.record_action(tool_name, action, params, before, result=result, elapsed_ms=(time.monotonic() - started) * 1000)
+        if isinstance(result.get("state"), dict): assistant.observe(result["state"])
         _record_action(
             tool_name,
             action,
@@ -106,11 +141,20 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
     def health_check() -> dict[str, Any]:
         return client.get_health()
 
-    def get_game_state() -> dict[str, Any]:
-        return client.get_state()
+    def get_game_state(compact: bool = False, include_descriptions: bool = False) -> dict[str, Any]:
+        state = _read_state()
+        if include_descriptions:
+            areas = [state.get(name, {}).get("cards", []) for name in ["hand", "jokers", "consumeables", "pack"]]
+            areas.extend(state.get("shop", {}).values())
+            for cards in areas:
+                for card in cards:
+                    if card.get("facing") != "back": card["effect"] = assistant.catalog.describe(card.get("key", ""), card, state)
+        return compact_state(state) if compact else state
 
     def get_raw_game_state() -> dict[str, Any]:
-        return client.get_state()
+        state = client.get_state()
+        assistant.observe(state)
+        return state
 
     def get_available_actions() -> dict[str, Any]:
         return {"actions": client.get_available_actions()}
@@ -128,6 +172,9 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
         seed: str | None = None,
         stake: int | None = None,
         blind: str | None = None,
+        expected_revision: str | None = None,
+        card_uids: list[str] | None = None,
+        control_mode: str | None = None,
     ) -> dict[str, Any]:
         return _execute_action(
             "act",
@@ -139,13 +186,16 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
             seed=seed,
             stake=stake,
             blind=blind,
+            expected_revision=expected_revision,
+            card_uids=card_uids,
+            control_mode=control_mode,
         )
 
     def wait_until_actionable(timeout: float = 30.0, poll_interval: float = 0.25) -> dict[str, Any]:
-        return client.wait_until_actionable(timeout=timeout, poll_interval=poll_interval)
+        return assistant.observe(client.wait_until_actionable(timeout=timeout, poll_interval=poll_interval))
 
     def continue_run(stake: int | None = None, seed: str | None = None) -> dict[str, Any]:
-        state = client.get_state()
+        state = _read_state()
         screen = _screen_name(state)
         if screen == "MENU":
             return _execute_action("continue_run", "start_run", stake=stake, seed=seed)
@@ -164,7 +214,7 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
         return _execute_action("choose_blind", "select_blind", blind=blind_name)
 
     def choose_option(option_id: str) -> dict[str, Any]:
-        state = client.get_state()
+        state = _read_state()
         if _is_pack_screen(_screen_name(state)):
             return _execute_action("choose_option", "use", area="pack", index=int(option_id))
 
@@ -175,7 +225,7 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
         return _execute_action("choose_option", "use", area="pack", index=int(option_id))
 
     def skip_choice() -> dict[str, Any]:
-        state = client.get_state()
+        state = _read_state()
         if _is_pack_screen(_screen_name(state)):
             return _execute_action("skip_choice", "skip_booster")
         return _execute_action("skip_choice", "skip_blind")
@@ -192,14 +242,14 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
         selected = [existing for existing in _highlighted_indices() if existing != card_index]
         return _execute_action("deselect_card", "select_cards", card_indices=selected)
 
-    def play_hand(card_indices: list[int] | None = None) -> dict[str, Any]:
-        return _execute_action("play_hand", "play_hand", card_indices=card_indices)
+    def play_hand(card_indices: list[int] | None = None, expected_revision: str | None = None) -> dict[str, Any]:
+        return _execute_action("play_hand", "play_hand", card_indices=card_indices, expected_revision=expected_revision)
 
-    def discard_selected(card_indices: list[int] | None = None) -> dict[str, Any]:
-        return _execute_action("discard_selected", "discard", card_indices=card_indices)
+    def discard_selected(card_indices: list[int] | None = None, expected_revision: str | None = None) -> dict[str, Any]:
+        return _execute_action("discard_selected", "discard", card_indices=card_indices, expected_revision=expected_revision)
 
     def end_turn() -> dict[str, Any]:
-        state = client.get_state()
+        state = _read_state()
         screen = _screen_name(state)
         if screen == "ROUND_EVAL":
             return _execute_action("end_turn", "cash_out")
@@ -225,10 +275,10 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
 
     def get_action_history(limit: int = 20) -> dict[str, Any]:
         capped = max(1, min(int(limit), MAX_HISTORY))
-        return {"history": list(reversed(action_history[-capped:]))}
+        return {"history": assistant.history(capped, "action") or list(reversed(action_history[-capped:]))}
 
     def get_run_summary() -> dict[str, Any]:
-        state = client.get_state()
+        state = _read_state()
         run = state.get("run") if isinstance(state.get("run"), dict) else {}
         hand = state.get("hand") if isinstance(state.get("hand"), dict) else {}
         blind_state = state.get("blind") if isinstance(state.get("blind"), dict) else {}
@@ -260,7 +310,109 @@ def create_tool_handlers(client: Any) -> dict[str, Callable[..., Any]]:
             "shop_items": shop_items,
         }
 
+    def get_deck_summary(include_cards: bool = False) -> dict[str, Any]:
+        state = _read_state()
+        if "deck" not in state: return {"available": False, "reason": "Restart Balatro to load the new Mod"}
+        deck = dict(state["deck"])
+        if not include_cards: deck.pop("cards", None)
+        return {"available": True, "revision": state.get("revision"), **deck}
+
+    def describe_card(key: str | None = None, area: str = "jokers", index: int | None = None) -> dict[str, Any]:
+        state = _read_state()
+        card = None
+        if index is not None:
+            cards = state.get("shop", {}).get(area.removeprefix("shop_"), []) if area.startswith("shop_") else state.get(area, {}).get("cards", [])
+            if not 1 <= index <= len(cards): raise ValueError("Invalid card area/index")
+            card = cards[index - 1]
+            if card.get("facing") == "back": return {"available": False, "reason": "Card is face down"}
+            key = card.get("key")
+        if not key: raise ValueError("Provide a center key or area and index")
+        return assistant.catalog.describe(key, card, state)
+
+    def get_scoring_model() -> dict[str, Any]:
+        _read_state()
+        return {"catalog": assistant.catalog.status, "scoring_data": assistant.catalog.scoring_data(), "cached_hand_definitions": assistant.hand_definitions,
+                "supported_global_jokers": sorted(analysis.PASSIVE | analysis.X_JOKERS),
+                "scope": "Pure deterministic model; each preview lists unmodeled effects and reports no exact score if partial"}
+
+    def get_hand_history(limit: int = 10) -> dict[str, Any]:
+        state = _read_state()
+        limit = max(1, min(limit, 1000))
+        entries = assistant.history(limit, "hand_result")
+        observations = state.get("observations", {})
+        last = observations.get("last_hand")
+        candidates = ([last] if last else []) + list(reversed(observations.get("hands", []))) + [x["hand"] for x in entries]
+        history, seen = [], set()
+        for hand in candidates:
+            if hand.get("id") not in seen:
+                history.append(hand)
+                seen.add(hand.get("id"))
+        return {"last_hand": last, "history": history[:limit],
+                "available": bool(state.get("capabilities", {}).get("scoring_observations")), "warnings": assistant.warnings}
+
+    def preview_hand(card_indices: list[int] | None = None) -> dict[str, Any]:
+        state = _read_state()
+        result = analysis.preview_hand(state, card_indices)
+        result["revision"] = state.get("revision")
+        return _analysis_result("preview_hand", {"card_indices": card_indices}, result)
+
+    def compare_plays(choices: list[list[int]]) -> dict[str, Any]:
+        if not 1 <= len(choices) <= 30: raise ValueError("Compare 1..30 choices")
+        state = _read_state()
+        results = [analysis.preview_hand(state, choice) for choice in choices]
+        strategy = assistant.config["strategy"]
+        usable = [(i, r) for i, r in enumerate(results) if r.get("status") == "supported"]
+        passing = [(i, r) for i, r in usable if r.get("passes_blind")]
+        pool = passing or usable
+        if strategy["objective"] == "record" or not passing:
+            ranked = sorted(pool, key=lambda pair: pair[1]["score"], reverse=True)
+        else:
+            ranked = sorted(pool, key=lambda pair: (pair[1]["any_glass_break_probability"] if strategy["preserve_glass"] else 0, -pair[1]["score"]))
+        return _analysis_result("compare_plays", {"choices": choices}, {"choices": results, "recommended_choice": ranked[0][0] + 1 if ranked else None,
+                                "strategy": strategy, "revision": state.get("revision")})
+
+    def compare_joker_swap(shop_index: int, replace_index: int, card_indices: list[int] | None = None,
+                           placement: int | None = None) -> dict[str, Any]:
+        state = _read_state()
+        result = analysis.compare_swap(state, assistant.catalog, shop_index, replace_index, card_indices, placement, assistant.config["strategy"]["horizon_rounds"])
+        result["below_cash_reserve"] = result["cash_after"] < assistant.config["strategy"]["min_cash"]
+        result["strategy"] = assistant.config["strategy"]
+        return _analysis_result("compare_joker_swap", {"shop_index": shop_index, "replace_index": replace_index, "placement": placement}, result)
+
+    def compare_consumable(index: int, card_indices: list[int] | None = None) -> dict[str, Any]:
+        result = analysis.compare_consumable(_read_state(), assistant.catalog, index, card_indices)
+        return _analysis_result("compare_consumable", {"index": index}, result)
+
+    def configure_assistant(patch: dict[str, Any], persist: bool = False) -> dict[str, Any]:
+        result = assistant.configure(patch, persist=persist)
+        assistant.write("configuration", configuration=result, persisted=persist)
+        return {"configuration": result, "persisted": persist, "restart_for_language_change": "language" in patch}
+
+    def get_assistant_config() -> dict[str, Any]:
+        return {"configuration": assistant.config, "catalog": assistant.catalog.status, "warnings": assistant.warnings}
+
+    def set_control_mode(mode: str, persist: bool = False) -> dict[str, Any]:
+        if mode not in {"assist", "auto"}: raise ValueError("Mode must be assist or auto")
+        result = _execute_action("set_control_mode", "set_control_mode", control_mode=mode)
+        assistant.configure({"control_mode": mode}, persist=persist)
+        if result.get("state"): assistant.observe(result["state"])
+        return result
+
+    def reorder_cards(area: str, card_uids: list[str], expected_revision: str | None = None) -> dict[str, Any]:
+        return _execute_action("reorder_cards", "reorder_cards", area=area, card_uids=card_uids, expected_revision=expected_revision)
+
+    def watch_state(after_revision: str | None = None, timeout: float = 25, poll_interval: float = .25) -> dict[str, Any]:
+        return assistant.watch(client, after_revision, timeout, poll_interval)
+
+    def get_log_history(limit: int = 20, kind: str | None = None) -> dict[str, Any]:
+        return {"history": assistant.history(limit, kind), "logging": assistant.config["logging"], "warnings": assistant.warnings}
+
     return {
+        "get_deck_summary": get_deck_summary, "describe_card": describe_card, "get_scoring_model": get_scoring_model,
+        "get_hand_history": get_hand_history, "preview_hand": preview_hand, "compare_plays": compare_plays,
+        "compare_joker_swap": compare_joker_swap, "compare_consumable": compare_consumable,
+        "configure_assistant": configure_assistant, "get_assistant_config": get_assistant_config,
+        "set_control_mode": set_control_mode, "reorder_cards": reorder_cards, "watch_state": watch_state, "get_log_history": get_log_history,
         "health_check": health_check,
         "get_game_state": get_game_state,
         "get_raw_game_state": get_raw_game_state,
@@ -297,9 +449,9 @@ def create_server(client: BalatroMCPClient | None = None) -> FastMCP:
         return handlers["health_check"]()
 
     @mcp.tool
-    def get_game_state() -> dict[str, Any]:
+    def get_game_state(compact: bool = False, include_descriptions: bool = False) -> dict[str, Any]:
         """Read the current Balatro state snapshot."""
-        return handlers["get_game_state"]()
+        return handlers["get_game_state"](compact=compact, include_descriptions=include_descriptions)
 
     @mcp.tool
     def get_raw_game_state() -> dict[str, Any]:
@@ -326,6 +478,9 @@ def create_server(client: BalatroMCPClient | None = None) -> FastMCP:
         seed: str | None = None,
         stake: int | None = None,
         blind: str | None = None,
+        expected_revision: str | None = None,
+        card_uids: list[str] | None = None,
+        control_mode: str | None = None,
     ) -> dict[str, Any]:
         """Execute a Balatro action exposed by the local mod."""
         return handlers["act"](
@@ -337,6 +492,9 @@ def create_server(client: BalatroMCPClient | None = None) -> FastMCP:
             seed=seed,
             stake=stake,
             blind=blind,
+            expected_revision=expected_revision,
+            card_uids=card_uids,
+            control_mode=control_mode,
         )
 
     @mcp.tool
@@ -375,14 +533,14 @@ def create_server(client: BalatroMCPClient | None = None) -> FastMCP:
         return handlers["deselect_card"](index=index)
 
     @mcp.tool
-    def play_hand(card_indices: list[int] | None = None) -> dict[str, Any]:
+    def play_hand(card_indices: list[int] | None = None, expected_revision: str | None = None) -> dict[str, Any]:
         """Play highlighted cards, or the supplied 1-based hand card indices."""
-        return handlers["play_hand"](card_indices=card_indices)
+        return handlers["play_hand"](card_indices=card_indices, expected_revision=expected_revision)
 
     @mcp.tool
-    def discard_selected(card_indices: list[int] | None = None) -> dict[str, Any]:
+    def discard_selected(card_indices: list[int] | None = None, expected_revision: str | None = None) -> dict[str, Any]:
         """Discard highlighted cards, or the supplied 1-based hand card indices."""
-        return handlers["discard_selected"](card_indices=card_indices)
+        return handlers["discard_selected"](card_indices=card_indices, expected_revision=expected_revision)
 
     @mcp.tool
     def end_turn() -> dict[str, Any]:
@@ -419,6 +577,24 @@ def create_server(client: BalatroMCPClient | None = None) -> FastMCP:
         """Return a compact summary of the current run."""
         return handlers["get_run_summary"]()
 
+    descriptions = {
+        "get_deck_summary": "Read current playing-deck composition and draw/discard counts. Does not reveal draw order.",
+        "describe_card": "Explain a card, blind, voucher or tag using localization reloaded from the installed game at MCP startup.",
+        "get_scoring_model": "Read in-memory scoring definitions and model scope.",
+        "get_hand_history": "Read preserved per-hand scores and native scoring trace, including manually played hands.",
+        "preview_hand": "Read-only score preview. Partial/unsupported results never claim an exact score.",
+        "compare_plays": "Compare candidate hands under the configured goal and glass preservation preference.",
+        "compare_joker_swap": "Compare a shop Joker replacement, scoring order, cash cost, growth and known income.",
+        "compare_consumable": "Compare using a Planet versus selling it, including permanent Constellation and temporary Campfire growth.",
+        "configure_assistant": "Update optional strategy/logging/control preferences; persist only when requested.",
+        "get_assistant_config": "Read optional assistant settings, catalog status and logging warnings.",
+        "set_control_mode": "Explicitly switch shared game control between human assist and MCP auto mode.",
+        "reorder_cards": "Reorder all hand or Joker cards by stable uid, with optional expected state revision.",
+        "watch_state": "Wait up to 60 seconds for a revision change and return a compact state and changed sections.",
+        "get_log_history": "Read persistent action, analysis, state, game event and hand-result logs across MCP restarts.",
+    }
+    for name, description in descriptions.items():
+        mcp.tool(name=name, description=description)(handlers[name])
     return mcp
 
 

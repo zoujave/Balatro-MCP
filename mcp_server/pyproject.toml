@@ -1,6 +1,6 @@
 [project]
 name = "balatro-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "FastMCP wrapper for the local Balatro MCP mod"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=8.0.0",
+    "lupa>=2.8",
 ]
 
 [project.scripts]

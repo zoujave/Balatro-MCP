@@ -1,0 +1,14 @@
+{
+  "control_mode": "inherit",
+  "strategy": {
+    "objective": "endless",
+    "preserve_glass": true,
+    "min_cash": 25,
+    "horizon_rounds": 3
+  },
+  "logging": {
+    "enabled": true,
+    "include_states": true
+  },
+  "language": "zh_CN"
+}

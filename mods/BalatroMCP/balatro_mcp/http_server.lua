@@ -147,7 +147,15 @@ function HttpServer:write_response(client_state, status, payload)
         "",
         body,
     }, "\r\n")
-    client_state.socket:send(response)
+    client_state.response = response
+    client_state.write_offset = 1
+end
+
+function HttpServer:flush_response(client_state)
+    local remaining = client_state.response:sub(client_state.write_offset)
+    local sent, err, partial = client_state.socket:send(remaining)
+    client_state.write_offset = client_state.write_offset + (sent or partial or 0)
+    return client_state.write_offset > #client_state.response or (err and err ~= 'timeout') and true or false
 end
 
 function HttpServer:health_payload()
@@ -240,10 +248,11 @@ function HttpServer:handle_request(request)
 end
 
 function HttpServer:handle_client(client_state)
+    if client_state.response then return self:flush_response(client_state) end
     local request, parse_error = parse_request(client_state.buffer)
     if parse_error then
         self:write_response(client_state, 400, envelope_error(parse_error, "Malformed HTTP request."))
-        return true
+        return self:flush_response(client_state)
     end
     if not request then
         return false
@@ -261,7 +270,7 @@ function HttpServer:handle_client(client_state)
         self:write_response(client_state, 500, envelope_error("internal_error", tostring(status), nil, true))
     end
 
-    return true
+    return self:flush_response(client_state)
 end
 
 function HttpServer:accept_clients()

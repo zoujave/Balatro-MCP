@@ -16,6 +16,7 @@ local ACTION_LOCK_SECONDS = {
     sell = 0.2,
     skip_booster = 0.7,
     sort_hand = 0.1,
+    reorder_cards = 0.1,
     return_to_menu = 1.2,
 }
 
@@ -552,6 +553,57 @@ local function action_return_to_menu(mcp)
     return ok(mcp, "return_to_menu", "Returned to menu.")
 end
 
+local function action_reorder_cards(mcp, request)
+    local area_name = request.area
+    local screen = state_name()
+    if not ((area_name == 'hand' and screen == 'SELECTING_HAND') or
+            (area_name == 'jokers' and (screen == 'SELECTING_HAND' or screen == 'SHOP' or screen == 'BLIND_SELECT'))) then
+        return fail('invalid_area', 'Only hand and joker cards can be reordered at an idle playing/shop screen.')
+    end
+    local area = get_area(area_name)
+    local uids = request.card_uids
+    if not area or type(area.cards) ~= 'table' or type(uids) ~= 'table' or #uids ~= #area.cards then
+        return fail('invalid_order', 'Provide every card uid in the area exactly once.')
+    end
+    local cards, seen, ordered = {}, {}, {}
+    for _, card in ipairs(area.cards) do
+        if card.states and card.states.drag and card.states.drag.is then
+            return fail('card_dragging', 'Wait until the human finishes dragging cards.')
+        end
+        if not card.sort_id then return fail('missing_card_uid', 'This card has no stable sort_id.') end
+        cards['c' .. tostring(card.sort_id)] = card
+    end
+    for _, uid in ipairs(uids) do
+        if type(uid) ~= 'string' or not cards[uid] or seen[uid] then
+            return fail('invalid_order', 'Card order contains an unknown or duplicate uid.')
+        end
+        ordered[#ordered + 1], seen[uid] = cards[uid], true
+    end
+    for index, card in ipairs(area.cards) do
+        if card.pinned and ordered[index] ~= card then
+            return fail('pinned_card', 'Pinned jokers must remain in their current position.')
+        end
+    end
+    area.cards = ordered
+    -- CardArea also sorts by physical x position each frame. Move both transforms.
+    for index, card in ipairs(ordered) do
+        local x = (area.T and area.T.x or 0) + index * 0.1
+        if card.T then card.T.x = x end
+        if card.VT then card.VT.x = x end
+    end
+    if area.set_ranks then area:set_ranks() end
+    if area.align_cards then area:align_cards() end
+    return ok(mcp, 'reorder_cards', 'Card order updated.')
+end
+
+local function action_set_control_mode(mcp, request)
+    if request.control_mode ~= 'assist' and request.control_mode ~= 'auto' then
+        return fail('invalid_control_mode', 'Control mode must be assist or auto.')
+    end
+    mcp.control_mode = request.control_mode
+    return {action = 'set_control_mode', mode = mcp.control_mode, state = current_state(mcp)}
+end
+
 local HANDLERS = {
     start_run = action_start_run,
     select_blind = action_select_blind,
@@ -569,6 +621,8 @@ local HANDLERS = {
     skip_booster = action_skip_booster,
     sort_hand = action_sort_hand,
     return_to_menu = action_return_to_menu,
+    reorder_cards = action_reorder_cards,
+    set_control_mode = action_set_control_mode,
 }
 
 function Actions.execute(mcp, request)
@@ -578,7 +632,23 @@ function Actions.execute(mcp, request)
         return fail("missing_action", "Request must include an action name.", nil, 400)
     end
 
-    if action_lock_active(mcp) then
+    local request_id = request.client_context and request.client_context.request_id
+    local signature = request_id and mcp.state.fingerprint_value(request)
+    if request_id and mcp.completed_requests and mcp.completed_requests[request_id] then
+        if mcp.completed_requests[request_id] ~= signature then
+            return fail('request_conflict', 'A request id cannot be reused with different parameters.')
+        end
+        return {action = action, duplicate = true, state = current_state(mcp)}
+    end
+    if action ~= 'set_control_mode' and mcp.control_mode == 'assist' then
+        return fail('assist_mode', 'The human controls the game in assist mode. Switch explicitly to auto to execute actions.')
+    end
+    local state = current_state(mcp)
+    if request.expected_revision and tostring(request.expected_revision) ~= tostring(state.revision) then
+        return fail('stale_state', 'Game state changed; reread before executing.', {expected = request.expected_revision, actual = state.revision})
+    end
+
+    if action ~= 'set_control_mode' and action_lock_active(mcp) then
         return fail("action_pending", "Previous action is still resolving.", {
             pending_action = mcp and mcp.pending_action,
             retry_after_seconds = math.max(0, (tonumber(mcp and mcp.action_lock_until) or 0) - current_time()),
@@ -590,7 +660,19 @@ function Actions.execute(mcp, request)
         return fail("unknown_action", "Unknown action.", { action = action }, 404)
     end
 
-    return handler(mcp, request)
+    local previous_actor, previous_request = mcp.current_actor, mcp.current_request_id
+    mcp.current_actor, mcp.current_request_id = 'mcp', request_id
+    local success, result, err = pcall(handler, mcp, request)
+    mcp.current_actor, mcp.current_request_id = previous_actor, previous_request
+    if not success then return callback_error('action_failed', result) end
+    if result and request_id then
+        mcp.completed_requests = mcp.completed_requests or {}
+        mcp.completed_order = mcp.completed_order or {}
+        mcp.completed_requests[request_id] = signature
+        mcp.completed_order[#mcp.completed_order + 1] = request_id
+        if #mcp.completed_order > 200 then mcp.completed_requests[table.remove(mcp.completed_order, 1)] = nil end
+    end
+    return result, err
 end
 
 return Actions

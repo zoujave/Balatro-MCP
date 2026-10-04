@@ -69,6 +69,9 @@ local function primitive_table(value, depth)
     if type(value) ~= "table" then
         return value
     end
+    if value.sort_id and value.config and value.config.center then
+        return {uid = 'c' .. tostring(value.sort_id), key = value.config.center.key}
+    end
 
     local result = {}
     for key, item in pairs(value) do
@@ -122,10 +125,13 @@ local function card_payload(card, index)
 
     return {
         index = index,
+        uid = card.sort_id and ('c' .. tostring(card.sort_id)),
         sort_id = card.sort_id,
         key = center_key(card),
         name = center_name(card),
         rarity = config.center and config.center.rarity,
+        blueprint_compat = config.center and config.center.blueprint_compat,
+        pinned = card.pinned and true or false,
         set = ability.set or (config.center and config.center.set),
         suit = base.suit,
         rank = base.value,
@@ -225,6 +231,10 @@ local function build_actions(screen, busy)
     end
 
     if screen == "BLIND_SELECT" and blind_ui_ready then
+        add_action(actions, "reorder_cards", "Reorder jokers by stable card uid.", {
+            {name = "area", type = "string", required = true},
+            {name = "card_uids", type = "array", required = true},
+        })
         add_action(actions, "select_blind", "Select the current blind on deck.", {
             { name = "blind", type = "string", required = false },
         })
@@ -235,6 +245,10 @@ local function build_actions(screen, busy)
     end
 
     if screen == "SELECTING_HAND" then
+        add_action(actions, "reorder_cards", "Reorder hand or joker cards by stable card uid.", {
+            {name = "area", type = "string", required = true},
+            {name = "card_uids", type = "array", required = true},
+        })
         add_action(actions, "select_cards", "Highlight cards in hand.", {
             { name = "card_indices", type = "array", required = true },
         })
@@ -256,6 +270,10 @@ local function build_actions(screen, busy)
     end
 
     if screen == "SHOP" then
+        add_action(actions, "reorder_cards", "Reorder jokers by stable card uid.", {
+            {name = "area", type = "string", required = true},
+            {name = "card_uids", type = "array", required = true},
+        })
         add_action(actions, "end_shop", "Leave the shop and return to blind select.")
         add_action(actions, "reroll_shop", "Reroll shop cards if affordable.")
         add_action(actions, "buy", "Buy or redeem a shop card.", {
@@ -375,6 +393,9 @@ local function build_run()
         round = game.round,
         round_payout = round.dollars,
         cash_out_ready = round_eval_ready(),
+        starting_deck_size = game.starting_deck_size,
+        probabilities = primitive_table(game.probabilities or {}),
+        modifiers = primitive_table(game.modifiers or {}),
     }
 end
 
@@ -421,13 +442,60 @@ local function build_decks()
     return result
 end
 
+local function build_deck()
+    local result = {cards = {}, by_suit = {}, by_rank = {}, by_enhancement = {}, by_seal = {}, by_edition = {},
+                    total = #(G and G.playing_cards or {}),
+                    starting_size = G and G.GAME and G.GAME.starting_deck_size or 52,
+                    draw_count = #(G and G.deck and G.deck.cards or {}),
+                    discard_count = #(G and G.discard and G.discard.cards or {})}
+    local zones = {}
+    for name, area in pairs({hand = G and G.hand, draw = G and G.deck, discard = G and G.discard, play = G and G.play}) do
+        for _, card in ipairs(area.cards or {}) do zones[card] = name end
+    end
+    local function tally(target, key)
+        key = tostring(key or 'none')
+        target[key] = (target[key] or 0) + 1
+    end
+    for _, card in ipairs(G and G.playing_cards or {}) do
+        local base = card.base or {}
+        local entry = {uid = card.sort_id and ('c' .. tostring(card.sort_id)), suit = base.suit, rank = base.value,
+                       id = base.id, key = center_key(card), seal = card.seal, edition = edition_name(card),
+                       area = zones[card] or 'other', debuffed = card.debuff and true or false}
+        result.cards[#result.cards + 1] = entry
+        tally(result.by_suit, entry.suit)
+        tally(result.by_rank, entry.rank)
+        tally(result.by_enhancement, entry.key)
+        tally(result.by_seal, entry.seal)
+        tally(result.by_edition, entry.edition)
+    end
+    -- Composition is public information. Never expose hidden draw order.
+    table.sort(result.cards, function(a, b) return tostring(a.uid or '') < tostring(b.uid or '') end)
+    return result
+end
+
+local function stable_value(value)
+    if type(value) == 'string' then return 's' .. tostring(#value) .. ':' .. value end
+    if type(value) ~= 'table' then return type(value) .. ':' .. tostring(value) end
+    local keys, parts = {}, {}
+    for key in pairs(value) do keys[#keys + 1] = key end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    for _, key in ipairs(keys) do parts[#parts + 1] = stable_value(key) .. '=' .. stable_value(value[key]) end
+    return '{' .. table.concat(parts, '|') .. '}'
+end
+
 function State.build_state(mcp)
     local screen = state_name()
     local busy = action_lock_active(mcp)
     local actions, available_actions = build_actions(screen, busy)
 
-    return {
-        state_version = 1,
+    if mcp and mcp.game_identity ~= (G and G.GAME) then
+        mcp.game_identity = G and G.GAME
+        mcp.run_sequence = (mcp.run_sequence or 0) + 1
+        mcp.run_id = (mcp.instance_id or 'local') .. ':run:' .. tostring(mcp.run_sequence)
+        mcp.last_hand, mcp.active_hand = nil, nil
+    end
+    local result = {
+        state_version = 2,
         mod_version = mcp and mcp.version or "0.0.0",
         timestamp = os.time(),
         screen = screen,
@@ -443,6 +511,12 @@ function State.build_state(mcp)
             speed = G and G.SETTINGS and G.SETTINGS.GAMESPEED,
         },
         decks = build_decks(),
+        deck = build_deck(),
+        run_id = mcp and mcp.run_id,
+        control = {mode = mcp and mcp.control_mode or 'assist'},
+        capabilities = {deck_summary = true, scoring_observations = true, guarded_actions = true,
+                        reorder_cards = true, shared_control = true},
+        observations = mcp and mcp.observations and mcp.observations.payload(mcp) or {},
         tags = build_tags(),
         run = build_run(),
         blind = build_blind(),
@@ -461,6 +535,23 @@ function State.build_state(mcp)
         shop = build_shop(),
         pack = build_pack(),
     }
+    if mcp then
+        local observed = {}
+        for _, key in ipairs({'screen', 'stage', 'session', 'run', 'blind', 'deck', 'hand', 'jokers', 'consumeables', 'shop', 'pack', 'tags', 'control'}) do
+            observed[key] = result[key]
+        end
+        observed.event_sequence = result.observations.sequence
+        local fingerprint = stable_value(observed)
+        if mcp.state_fingerprint ~= fingerprint then
+            mcp.state_fingerprint = fingerprint
+            mcp.revision_sequence = (mcp.revision_sequence or 0) + 1
+        end
+        result.revision = (mcp.instance_id or 'local') .. ':' .. tostring(mcp.revision_sequence or 0)
+    end
+    return result
 end
 
+State.card_payload = card_payload
+State.snapshot_value = primitive_table
+State.fingerprint_value = stable_value
 return State

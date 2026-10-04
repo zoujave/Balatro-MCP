@@ -75,7 +75,12 @@ class BalatroMCPClient:
         stake: int | None = None,
         blind: str | None = None,
         client_context: dict[str, Any] | None = None,
+        expected_revision: str | None = None,
+        card_uids: list[str] | None = None,
+        control_mode: str | None = None,
     ) -> dict[str, Any]:
+        extra = {k: v for k, v in {"expected_revision": expected_revision, "card_uids": card_uids,
+                                  "control_mode": control_mode}.items() if v is not None}
         return self._request(
             "POST",
             "/action",
@@ -89,6 +94,7 @@ class BalatroMCPClient:
                 "stake": stake,
                 "blind": blind,
                 "client_context": client_context,
+                **extra,
             },
             is_action=True,
         )

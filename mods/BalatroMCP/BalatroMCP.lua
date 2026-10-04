@@ -8,10 +8,12 @@ local function load_mcp_module(path)
 end
 
 BalatroMCP = BalatroMCP or {}
-BalatroMCP.version = "0.1.0"
+BalatroMCP.version = "0.2.0"
 BalatroMCP.JSON = load_mcp_module("balatro_mcp/json.lua")
 BalatroMCP.state = load_mcp_module("balatro_mcp/state.lua")
 BalatroMCP.actions = load_mcp_module("balatro_mcp/actions.lua")
+BalatroMCP.observations = load_mcp_module("balatro_mcp/observations.lua")
+BalatroMCP.observations.initialize(BalatroMCP)
 BalatroMCP.HttpServer = load_mcp_module("balatro_mcp/http_server.lua")
 BalatroMCP.port = tonumber(os.getenv("BALATRO_MCP_PORT") or "8080") or 8080
 BalatroMCP.server = BalatroMCP.HttpServer.new(BalatroMCP, {
@@ -20,6 +22,7 @@ BalatroMCP.server = BalatroMCP.HttpServer.new(BalatroMCP, {
 })
 
 function BalatroMCP.update(dt)
+    BalatroMCP.observations.install(BalatroMCP)
     if BalatroMCP.server and BalatroMCP.server.update then
         BalatroMCP.server:update(dt)
     end
