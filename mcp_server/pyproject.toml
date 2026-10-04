@@ -2,7 +2,7 @@
 name = "balatro-mcp"
 version = "0.1.0"
 description = "FastMCP wrapper for the local Balatro MCP mod"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=3.1.0,<4.0.0",

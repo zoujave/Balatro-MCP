@@ -50,9 +50,10 @@ if (Test-Path -LiteralPath $legacyMod) {
 
 Copy-Item -LiteralPath $sourceMod -Destination $targetMod -Recurse -Force
 
-$lovelyDll = Join-Path $BalatroPath "version.dll"
-if (-not (Test-Path -LiteralPath $lovelyDll)) {
-    Write-Warning "Lovely is not installed. Expected version.dll in $BalatroPath"
+$lovelyDll = Join-Path $BalatroPath "winmm.dll"
+$legacyLovelyDll = Join-Path $BalatroPath "version.dll"
+if (-not ((Test-Path -LiteralPath $lovelyDll) -or (Test-Path -LiteralPath $legacyLovelyDll))) {
+    Write-Warning "Lovely is not installed. Expected winmm.dll (Lovely 0.10+) or version.dll in $BalatroPath"
 }
 
 $steamodded = Get-ChildItem -LiteralPath $modsDir -Directory -ErrorAction SilentlyContinue |
