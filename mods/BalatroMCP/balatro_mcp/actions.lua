@@ -450,6 +450,9 @@ local function action_reroll_boss(mcp)
     if state_name() ~= "BLIND_SELECT" then
         return fail("invalid_state", "Blind selection is not active.", { screen = state_name() })
     end
+    if not mcp.state.can_reroll_boss() then
+        return fail("not_available", "Boss reroll requires an affordable, unused voucher allowance.")
+    end
     G.FUNCS.reroll_boss({})
     return ok(mcp, "reroll_boss", "Boss reroll queued.")
 end

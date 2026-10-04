@@ -125,6 +125,7 @@ local function card_payload(card, index)
         sort_id = card.sort_id,
         key = center_key(card),
         name = center_name(card),
+        rarity = config.center and config.center.rarity,
         set = ability.set or (config.center and config.center.set),
         suit = base.suit,
         rank = base.value,
@@ -194,6 +195,19 @@ local function round_eval_ready()
     return false
 end
 
+function State.can_reroll_boss()
+    local game = G and G.GAME
+    if not game or state_name() ~= "BLIND_SELECT" then
+        return false
+    end
+    local vouchers = game.used_vouchers or {}
+    local resets = game.round_resets or {}
+    local affordable = (game.dollars or 0) - (game.bankrupt_at or 0) >= 10
+    local allowed = vouchers.v_retcon or
+        (vouchers.v_directors_cut and not resets.boss_rerolled)
+    return affordable and allowed and true or false
+end
+
 local function build_actions(screen, busy)
     local actions = {}
     if busy then
@@ -215,7 +229,7 @@ local function build_actions(screen, busy)
             { name = "blind", type = "string", required = false },
         })
         add_action(actions, "skip_blind", "Skip the current blind and receive its tag.")
-        if G and G.GAME and G.GAME.blind_on_deck == "Boss" then
+        if State.can_reroll_boss() then
             add_action(actions, "reroll_boss", "Reroll the boss blind when vouchers allow it.")
         end
     end
